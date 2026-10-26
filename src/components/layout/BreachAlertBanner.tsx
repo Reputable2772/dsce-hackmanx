@@ -98,7 +98,7 @@ export const BreachAlertBanner: React.FC = () => {
     setTimeout(() => setCopiedCmd(null), 2000);
   };
 
-  if (!activeAlert) return null;
+  if (!activeAlert || activeAlert.severity === 'INFO') return null;
 
   const isCritical = activeAlert.severity === 'CRITICAL' || activeAlert.eventType.includes('DEGRADED');
 
@@ -175,14 +175,14 @@ export const BreachAlertBanner: React.FC = () => {
 
       {/* Slide-Down Instant Copilot Quick-Drawer */}
       {expanded && (
-        <div className="border-t border-black/20 bg-slate-900/95 text-slate-100 p-5 backdrop-blur-md shadow-2xl transition-all">
+        <div className="border-t border-[#E3E8F0] bg-white text-[#202938] p-5 shadow-xl transition-all">
           <div className="mx-auto max-w-7xl space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E3E8F0] pb-3">
               <div className="flex items-center gap-2 font-mono text-xs">
-                <Sparkles className="h-4 w-4 text-indigo-400" />
-                <span className="font-bold text-slate-200">Instant AI Root-Cause Synthesis & Remediation</span>
+                <Sparkles className="h-4 w-4 text-[#5267D8]" />
+                <span className="font-bold text-[#202938]">Instant AI Root-Cause Synthesis & Remediation</span>
                 {copilotData?.model_used && (
-                  <span className="inline-flex items-center gap-1 rounded bg-indigo-950/70 border border-indigo-700/50 px-2 py-0.5 text-[10px] text-indigo-300">
+                  <span className="inline-flex items-center gap-1 rounded bg-[#EEF2FF] border border-[#CBD5E1] px-2 py-0.5 text-[10px] font-bold text-[#5267D8]">
                     <Cpu className="h-3 w-3" />
                     <span>{copilotData.model_used}</span>
                   </span>
@@ -190,7 +190,7 @@ export const BreachAlertBanner: React.FC = () => {
               </div>
               <button
                 onClick={handleOpenWorkspace}
-                className="inline-flex items-center gap-1.5 text-xs font-mono text-indigo-300 hover:text-indigo-200 underline"
+                className="inline-flex items-center gap-1.5 text-xs font-mono font-semibold text-[#5267D8] hover:text-[#4355B9] hover:underline"
               >
                 <span>Open Full Copilot Workspace</span>
                 <ExternalLink className="h-3 w-3" />
@@ -198,18 +198,18 @@ export const BreachAlertBanner: React.FC = () => {
             </div>
 
             {loadingCopilot ? (
-              <div className="py-6 text-center font-mono text-xs text-slate-400 animate-pulse">
+              <div className="py-6 text-center font-mono text-xs text-[#687386] animate-pulse">
                 Synthesizing grounded hypotheses and verifying numerical claims against physical telemetry...
               </div>
             ) : copilotData ? (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
                 {/* Hypothesis & Entailment Matrix */}
-                <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-3">
+                <div className="rounded-xl border border-[#E3E8F0] bg-[#F8FAFC] p-4 space-y-3 shadow-xs">
                   <div className="space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-indigo-400 tracking-wider">
+                    <span className="text-[10px] uppercase font-bold text-[#5267D8] tracking-wider">
                       Grounded AI Explanation
                     </span>
-                    <p className="text-slate-300 leading-relaxed font-sans text-xs">
+                    <p className="text-[#334155] leading-relaxed font-sans text-xs">
                       {copilotData.summary || 'Anomalous telemetry deviation detected.'}
                     </p>
                   </div>
@@ -221,16 +221,16 @@ export const BreachAlertBanner: React.FC = () => {
                 </div>
 
                 {/* Diagnostic Commands with One-Click Copy */}
-                <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-2">
-                  <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider flex items-center gap-1">
-                    <Terminal className="h-3 w-3" />
+                <div className="rounded-xl border border-[#E3E8F0] bg-[#F8FAFC] p-4 space-y-2 shadow-xs">
+                  <span className="text-[10px] uppercase font-bold text-amber-700 tracking-wider flex items-center gap-1">
+                    <Terminal className="h-3 w-3 text-amber-600" />
                     Copyable Runbook Commands
                   </span>
                   <div className="space-y-1.5">
                     {copilotData.diagnostic_commands?.slice(0, 3).map((cmd: string, idx: number) => (
                       <div
                         key={idx}
-                        className="flex items-center justify-between gap-2 rounded bg-black/40 border border-slate-800 px-2 py-1 text-[11px] text-slate-300 font-mono"
+                        className="flex items-center justify-between gap-2 rounded-lg bg-[#1E293B] border border-[#334155] px-2.5 py-1 text-[11px] text-emerald-400 font-mono shadow-xs"
                       >
                         <span className="truncate">{cmd}</span>
                         <button
@@ -246,17 +246,17 @@ export const BreachAlertBanner: React.FC = () => {
                 </div>
 
                 {/* Audited Assumptions & Verification */}
-                <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-2">
-                  <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider flex items-center gap-1">
-                    <CheckCircle2 className="h-3 w-3" />
+                <div className="rounded-xl border border-[#E3E8F0] bg-[#F8FAFC] p-4 space-y-2 shadow-xs">
+                  <span className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3 text-emerald-600" />
                     Audited Operational Claims
                   </span>
                   <div className="space-y-1.5 text-[11px]">
                     {copilotData.assumptions?.slice(0, 3).map((a: any, idx: number) => (
-                      <div key={idx} className="flex items-center justify-between gap-2 text-slate-300">
-                        <span className="truncate">{a.statement}</span>
-                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
-                          a.status === 'VALIDATED' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'
+                      <div key={idx} className="flex items-center justify-between gap-2 text-[#202938]">
+                        <span className="truncate text-[#334155]">{a.statement}</span>
+                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold border ${
+                          a.status === 'VALIDATED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
                         }`}>
                           {a.status}
                         </span>

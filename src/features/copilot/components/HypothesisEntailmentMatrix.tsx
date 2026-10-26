@@ -74,23 +74,23 @@ export const HypothesisEntailmentMatrix: React.FC<HypothesisEntailmentMatrixProp
     switch (status) {
       case 'VALIDATED':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-500/30">
-            <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <CheckCircle2 className="h-3 w-3 text-emerald-600" />
             <span>VALIDATED {supporting && supporting.length > 0 ? `(${supporting.join(', ')})` : ''}</span>
           </span>
         );
       case 'REFUTED':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-rose-950/80 text-rose-400 border border-rose-500/30">
-            <XCircle className="h-3 w-3 text-rose-400" />
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200">
+            <XCircle className="h-3 w-3 text-rose-600" />
             <span>REFUTED</span>
           </span>
         );
       case 'UNVERIFIED':
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-950/80 text-amber-400 border border-amber-500/30">
-            <AlertTriangle className="h-3 w-3 text-amber-400" />
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200">
+            <AlertTriangle className="h-3 w-3 text-amber-600" />
             <span>UNVERIFIED</span>
           </span>
         );
@@ -101,19 +101,19 @@ export const HypothesisEntailmentMatrix: React.FC<HypothesisEntailmentMatrixProp
     switch (status) {
       case 'VALIDATED':
         return (
-          <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 rounded px-1.5 py-0.2">
+          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.2">
             VALIDATED
           </span>
         );
       case 'VIOLATED':
         return (
-          <span className="text-[9px] font-bold text-rose-400 bg-rose-950/60 border border-rose-500/30 rounded px-1.5 py-0.2">
+          <span className="text-[9px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded px-1.5 py-0.2">
             VIOLATED
           </span>
         );
       default:
         return (
-          <span className="text-[9px] font-bold text-amber-400 bg-amber-950/60 border border-amber-500/30 rounded px-1.5 py-0.2">
+          <span className="text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.2">
             UNTESTABLE
           </span>
         );
@@ -122,7 +122,7 @@ export const HypothesisEntailmentMatrix: React.FC<HypothesisEntailmentMatrixProp
 
   if (normalizedHypotheses.length === 0) {
     return (
-      <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4 text-center text-xs text-slate-400 font-mono">
+      <div className="rounded-xl border border-[#E3E8F0] bg-[#F8FAFC] p-4 text-center text-xs text-[#687386] font-mono">
         No structured hypotheses synthesized for this event.
       </div>
     );
@@ -131,14 +131,14 @@ export const HypothesisEntailmentMatrix: React.FC<HypothesisEntailmentMatrixProp
   return (
     <div className="space-y-3 font-sans">
       {!isCompact && (
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+        <div className="flex items-center justify-between border-b border-[#E3E8F0] pb-2">
           <div className="flex items-center gap-2">
-            <Scale className="h-4 w-4 text-indigo-400" />
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200 font-mono">
+            <Scale className="h-4 w-4 text-[#5267D8]" />
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#202938] font-mono">
               Hypothesis-Assumption Entailment Matrix
             </h4>
           </div>
-          <span className="text-[10px] font-mono text-slate-400">
+          <span className="text-[10px] font-mono text-[#687386]">
             Automated Mathematical Verification
           </span>
         </div>
@@ -156,32 +156,32 @@ export const HypothesisEntailmentMatrix: React.FC<HypothesisEntailmentMatrixProp
               key={hyp.id}
               className={`rounded-xl border transition-all ${
                 hyp.status === 'VALIDATED'
-                  ? 'border-emerald-500/30 bg-emerald-950/10 hover:border-emerald-500/50'
+                  ? 'border-emerald-200 bg-emerald-50/40 hover:border-emerald-300'
                   : hyp.status === 'REFUTED'
-                  ? 'border-rose-500/30 bg-rose-950/10 hover:border-rose-500/50'
-                  : 'border-slate-800 bg-slate-900/50 hover:border-slate-700'
-              } p-3`}
+                  ? 'border-rose-200 bg-rose-50/40 hover:border-rose-300'
+                  : 'border-[#E3E8F0] bg-[#F8FAFC] hover:border-[#5267D8]'
+              } p-3 shadow-xs`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-xs font-bold text-indigo-400 bg-indigo-950/60 border border-indigo-500/30 px-1.5 py-0.5 rounded">
+                    <span className="font-mono text-xs font-bold text-[#5267D8] bg-[#EEF2FF] border border-[#CBD5E1] px-1.5 py-0.5 rounded">
                       {hyp.id}
                     </span>
-                    <span className="text-xs font-semibold text-slate-200">
+                    <span className="text-xs font-semibold text-[#202938]">
                       {hyp.statement}
                     </span>
                     {getStatusBadge(hyp.status, hyp.supporting_assumptions)}
                   </div>
 
-                  <p className="text-[11px] text-slate-400 leading-relaxed pt-0.5">
+                  <p className="text-[11px] text-[#475569] leading-relaxed pt-0.5">
                     {hyp.entailment_explanation}
                   </p>
 
                   {/* Supporting Assumptions Tags */}
                   {hyp.supporting_assumptions && hyp.supporting_assumptions.length > 0 && (
                     <div className="flex items-center gap-1.5 flex-wrap pt-1.5">
-                      <span className="text-[10px] font-mono text-slate-500">Supporting Claims:</span>
+                      <span className="text-[10px] font-mono text-[#687386]">Supporting Claims:</span>
                       {hyp.supporting_assumptions.map((assId) => {
                         const ass = assumptions.find((a) => a.id === assId);
                         const isAssSelected = selectedAssumptionId === assId;
@@ -191,10 +191,10 @@ export const HypothesisEntailmentMatrix: React.FC<HypothesisEntailmentMatrixProp
                             onClick={() => setSelectedAssumptionId(isAssSelected ? null : assId)}
                             className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono border transition ${
                               ass?.status === 'VALIDATED'
-                                ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30 hover:border-emerald-400'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:border-emerald-400'
                                 : ass?.status === 'VIOLATED'
-                                ? 'bg-rose-950/40 text-rose-300 border-rose-500/30 hover:border-rose-400'
-                                : 'bg-slate-800/60 text-slate-300 border-slate-700 hover:border-slate-600'
+                                ? 'bg-rose-50 text-rose-800 border-rose-200 hover:border-rose-400'
+                                : 'bg-white text-[#202938] border-[#CBD5E1] hover:border-[#5267D8]'
                             }`}
                           >
                             <span>{assId}</span>
@@ -207,13 +207,13 @@ export const HypothesisEntailmentMatrix: React.FC<HypothesisEntailmentMatrixProp
                 </div>
 
                 <div className="flex flex-col items-end gap-1.5 shrink-0">
-                  <span className="text-[10px] font-mono text-slate-400">
-                    Conf: <strong className="text-slate-200">{Math.round(hyp.confidence * 100)}%</strong>
+                  <span className="text-[10px] font-mono text-[#687386]">
+                    Conf: <strong className="text-[#202938]">{Math.round(hyp.confidence * 100)}%</strong>
                   </span>
                   {(linkedAssumptions.length > 0 || hyp.rationale) && (
                     <button
                       onClick={() => setExpandedHypothesisId(isExpanded ? null : hyp.id)}
-                      className="p-1 text-slate-400 hover:text-slate-200 transition"
+                      className="p-1 text-[#687386] hover:text-[#202938] transition"
                       title={isExpanded ? 'Collapse audit details' : 'Expand audit details'}
                     >
                       {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
@@ -224,10 +224,10 @@ export const HypothesisEntailmentMatrix: React.FC<HypothesisEntailmentMatrixProp
 
               {/* Expanded Audit Card */}
               {isExpanded && (
-                <div className="mt-3 pt-3 border-t border-slate-800/80 space-y-2 text-xs font-mono">
+                <div className="mt-3 pt-3 border-t border-[#E3E8F0] space-y-2 text-xs font-mono">
                   {hyp.rationale && (
-                    <div className="rounded bg-black/40 border border-slate-800 p-2 text-[11px] text-slate-300">
-                      <span className="text-slate-500 block mb-0.5 text-[10px] uppercase font-bold">
+                    <div className="rounded-lg bg-white border border-[#E3E8F0] p-2.5 text-[11px] text-[#334155] shadow-xs">
+                      <span className="text-[#687386] block mb-0.5 text-[10px] uppercase font-bold">
                         Ground Truth Rationale
                       </span>
                       {hyp.rationale}
@@ -236,31 +236,31 @@ export const HypothesisEntailmentMatrix: React.FC<HypothesisEntailmentMatrixProp
 
                   {linkedAssumptions.length > 0 && (
                     <div className="space-y-1.5">
-                      <span className="text-slate-500 block text-[10px] uppercase font-bold">
+                      <span className="text-[#687386] block text-[10px] uppercase font-bold">
                         Linked Mathematical Telemetry Predicates
                       </span>
                       {linkedAssumptions.map((ass) => (
                         <div
                           key={ass.id}
-                          className={`rounded border p-2 flex items-center justify-between gap-3 text-[11px] ${
+                          className={`rounded-lg border p-2.5 flex items-center justify-between gap-3 text-[11px] bg-white shadow-xs ${
                             ass.status === 'VALIDATED'
-                              ? 'border-emerald-500/30 bg-emerald-950/20'
+                              ? 'border-emerald-200'
                               : ass.status === 'VIOLATED'
-                              ? 'border-rose-500/30 bg-rose-950/20'
-                              : 'border-slate-800 bg-slate-900/60'
+                              ? 'border-rose-200'
+                              : 'border-[#E3E8F0]'
                           }`}
                         >
                           <div className="space-y-0.5">
                             <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-slate-200">{ass.id}:</span>
-                              <span className="text-slate-300 font-sans">{ass.statement}</span>
+                              <span className="font-bold text-[#202938]">{ass.id}:</span>
+                              <span className="text-[#334155] font-sans">{ass.statement}</span>
                             </div>
                             {ass.metric_id && (
-                              <div className="text-[10px] text-slate-400">
-                                Predicate: <code className="text-indigo-300">{ass.metric_id} {ass.operator} {ass.expected_value}</code>
+                              <div className="text-[10px] text-[#687386]">
+                                Predicate: <code className="text-[#5267D8] bg-[#EEF2FF] px-1 py-0.2 rounded font-mono">{ass.metric_id} {ass.operator} {ass.expected_value}</code>
                                 {ass.actual_value !== undefined && ass.actual_value !== null && (
-                                  <span className="ml-2">
-                                    Observed: <strong className={ass.status === 'VALIDATED' ? 'text-emerald-400' : 'text-rose-400'}>{ass.actual_value}</strong>
+                                  <span className="ml-2 font-mono">
+                                    Observed: <strong className={ass.status === 'VALIDATED' ? 'text-emerald-700' : 'text-rose-700'}>{ass.actual_value}</strong>
                                   </span>
                                 )}
                               </div>

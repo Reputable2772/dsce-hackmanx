@@ -74,6 +74,9 @@ export function useBreachNotifications() {
   }, []);
 
   const triggerAlert = useCallback((alert: BreachAlert) => {
+    // Only alert for actual failures and degradation breaches, never for recovery/success/INFO
+    if (alert.severity === 'INFO') return;
+
     setActiveAlert(alert);
     playAlertSound(alert.severity === 'CRITICAL' || alert.eventType.includes('DEGRADED') || alert.eventType.includes('ABSTAIN'));
 
@@ -109,10 +112,17 @@ export function useBreachNotifications() {
             const sevStr = String(ev.severity || '').toUpperCase();
             const isCritical = sevStr.includes('CRITICAL') || sevStr.includes('HIGH');
             const isWarning = sevStr.includes('WARNING') || sevStr.includes('MEDIUM');
-            const isAlertEvent = isCritical || isWarning || ev.event_type === 'GATE_STATE_TRANSITION' || String(ev.event_type || '').includes('INCIDENT');
 
-            if (isAlertEvent) {
-              const normalizedSeverity: 'CRITICAL' | 'WARNING' | 'INFO' = isCritical ? 'CRITICAL' : isWarning ? 'WARNING' : 'INFO';
+            // Strictly alert on actual failures and breaches (WARNING or CRITICAL only).
+            // Do NOT alert on INFO, normal operational bounds, recovery to PREDICT, or resolved incidents.
+            const isFailureAlert =
+              (isCritical || isWarning) &&
+              ev.severity !== 'INFO' &&
+              !String(ev.title || '').endsWith('-> PREDICT') &&
+              !String(ev.event_type || '').includes('RESOLVED');
+
+            if (isFailureAlert) {
+              const normalizedSeverity: 'CRITICAL' | 'WARNING' = isCritical ? 'CRITICAL' : 'WARNING';
               triggerAlert({
                 id: ev.id,
                 timestamp: ev.timestamp,

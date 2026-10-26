@@ -374,11 +374,13 @@ class SystemRegistry:
             for r in node_rows:
                 n_id = r["id"]
                 if mode == "live" and (
-                    n_id.startswith(("sw-", "rtr-", "gw-", "leaf-", "spine-"))
+                    n_id.startswith(("sw-", "rtr-", "gw-", "leaf-", "spine-", "core-router", "db-server", "target-1.1.1.1", "target-127.0.0.1"))
                     or "fixture" in n_id
                     or "Spine" in r["name"]
                     or "Leaf" in r["name"]
                     or "Gateway" in r["name"]
+                    or "Db Server" in r["name"]
+                    or "Core Router" in r["name"]
                 ):
                     continue
 

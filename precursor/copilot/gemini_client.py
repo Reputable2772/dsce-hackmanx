@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any
 
 logger = logging.getLogger("precursor.gemini")
 
-DEFAULT_GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+DEFAULT_GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
 
 
 def fire_ollama_prompt_async(base_url: str, model: str, prompt: str) -> None:

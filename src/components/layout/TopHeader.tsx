@@ -69,7 +69,9 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onOpenMobileMenu }) => {
       const res = await apiClient.fetchNotifications(30);
       if (res && res.events) {
         setEvents(res.events);
-        const unread = res.events.filter((e: OperationalEventItem) => e.is_read === 0).length;
+        const unread = res.events.filter(
+          (e: OperationalEventItem) => e.is_read === 0 && e.severity !== 'INFO'
+        ).length;
         setUnreadCount(unread);
       }
     } catch {
