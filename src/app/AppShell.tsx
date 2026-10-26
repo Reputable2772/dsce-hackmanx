@@ -1,11 +1,20 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { TopNavigation } from '@/components/layout/TopNavigation';
 import { ScenarioToolbar } from '@/components/layout/ScenarioToolbar';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+import { useAppStore } from '@/stores/useAppStore';
 
 export const AppShell: React.FC = () => {
   const { theme, density } = useSettingsStore();
+
+  useEffect(() => {
+    // Mount live health polling against backend service
+    const stopPolling = useAppStore.getState().startLivePolling(4000);
+    return () => {
+      stopPolling();
+    };
+  }, []);
 
   const themeClass = theme === 'dark-slate' ? 'bg-[#0F141C]' : 'bg-precursor-navy';
   const densityClass = density === 'compact' ? 'text-xs' : '';

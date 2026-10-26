@@ -40,8 +40,9 @@ export const NetworkNode3D: React.FC<NetworkNode3DProps> = ({
   useFrame((state, delta) => {
     if (pulseRingRef.current) {
       if (node.status === 'degraded' || node.status === 'critical' || isSelected) {
+        const pulseRate = node.status === 'critical' ? 8 : 4;
         pulseRingRef.current.rotation.z += delta * (node.status === 'critical' ? 2.5 : 1.2);
-        const scale = 1 + Math.sin(state.clock.elapsedTime * (node.status === 'critical' ? 8 : 4)) * 0.15;
+        const scale = 1 + Math.sin(state.clock.elapsedTime * pulseRate) * 0.15;
         pulseRingRef.current.scale.set(scale, scale, scale);
       }
     }

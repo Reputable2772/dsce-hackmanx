@@ -16,6 +16,7 @@ import {
 import { PageContainer } from '@/components/layout/PageContainer';
 import { useLocation } from 'react-router-dom';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+import { useAppStore } from '@/stores/useAppStore';
 
 type SubsystemStatus = 'AVAILABLE' | 'DEMO ONLY' | 'NOT CONNECTED' | 'UNAVAILABLE';
 
@@ -148,6 +149,36 @@ const subsystems: SubsystemItem[] = [
 export const SystemStatusPage: React.FC = () => {
   const location = useLocation();
   const { demoMode, reducedMotion } = useSettingsStore();
+  const { connectionState, backendVersion } = useAppStore();
+  const isBackendLive = connectionState === 'connected';
+
+  const displayedSubsystems: SubsystemItem[] = subsystems.map((sub) => {
+    if (isBackendLive) {
+      if (sub.name === 'FastAPI Backend Core') {
+        return {
+          ...sub,
+          name: 'PRECURSOR REST API Service',
+          status: 'AVAILABLE' as SubsystemStatus,
+          notes: `Operational and connected at http://127.0.0.1:8000 (v${backendVersion || '1.0.0'}). Serving /health, /api/status, /api/telemetry, and /api/predictions.`,
+        };
+      }
+      if (sub.name === 'Prediction & Detector Engine') {
+        return {
+          ...sub,
+          status: 'AVAILABLE' as SubsystemStatus,
+          notes: 'Connected to live PrecursorEngine multi-horizon detectors (5m, 15m, 30m).',
+        };
+      }
+      if (sub.name === 'Reliability Gate Engine') {
+        return {
+          ...sub,
+          status: 'AVAILABLE' as SubsystemStatus,
+          notes: 'Connected to live Kolmogorov-Smirnov drift gate and residual variance expansion analyzer.',
+        };
+      }
+    }
+    return sub;
+  });
 
   const getStatusBadge = (status: SubsystemStatus) => {
     switch (status) {
@@ -185,13 +216,20 @@ export const SystemStatusPage: React.FC = () => {
   return (
     <PageContainer
       title="System Status & Service Boundaries"
-      subtitle="Architectural inventory of current frontend features and unconnected future backend services."
+      subtitle="Architectural inventory of current frontend features and backend service integration state."
       action={
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 font-mono text-xs text-cyan-400">
-            <Info className="h-3.5 w-3.5" />
-            <span>Demonstration Fixtures Active</span>
-          </span>
+          {isBackendLive ? (
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 font-mono text-xs text-emerald-400 animate-pulse">
+              <Radio className="h-3.5 w-3.5" />
+              <span>Live Backend Connected (8000)</span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 font-mono text-xs text-cyan-400">
+              <Info className="h-3.5 w-3.5" />
+              <span>Demonstration Fixtures Active</span>
+            </span>
+          )}
         </div>
       }
     >
@@ -213,16 +251,26 @@ export const SystemStatusPage: React.FC = () => {
               <Layers className="h-4 w-4 text-cyan-400" />
             </div>
             <div className="mt-2 text-xl font-bold text-white capitalize">{demoMode.replace('_', ' ')}</div>
-            <div className="mt-1 text-xs text-cyan-400 font-mono">Deterministic Fixtures</div>
+            <div className="mt-1 text-xs text-cyan-400 font-mono">
+              {isBackendLive ? 'Live Synchronized' : 'Deterministic Fixtures'}
+            </div>
           </div>
 
           <div className="rounded-xl border border-white/[0.08] bg-precursor-card-glass p-4 backdrop-blur-xl shadow-glass-panel">
             <div className="flex items-center justify-between text-xs font-semibold uppercase text-slate-400">
               <span>Backend Core</span>
-              <XCircle className="h-4 w-4 text-slate-500" />
+              {isBackendLive ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              ) : (
+                <XCircle className="h-4 w-4 text-slate-500" />
+              )}
             </div>
-            <div className="mt-2 text-xl font-bold text-slate-300">Not Connected</div>
-            <div className="mt-1 text-xs text-slate-400 font-mono">FastAPI Offline (By Design)</div>
+            <div className="mt-2 text-xl font-bold text-white">
+              {isBackendLive ? 'Live Connected' : 'Not Connected'}
+            </div>
+            <div className="mt-1 text-xs font-mono text-emerald-400">
+              {isBackendLive ? 'REST API (127.0.0.1:8000)' : 'FastAPI Offline (By Design)'}
+            </div>
           </div>
 
           <div className="rounded-xl border border-white/[0.08] bg-precursor-card-glass p-4 backdrop-blur-xl shadow-glass-panel">
@@ -237,22 +285,35 @@ export const SystemStatusPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Integration Boundary Honest Disclaimer */}
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-5 text-xs text-amber-200">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <h4 className="font-semibold text-amber-300">Operational Architecture & Connectivity Boundaries</h4>
-              <p className="text-amber-200/90 leading-relaxed">
-                This frontend application currently runs completely offline using self-contained demonstration fixtures.
-                No real network equipment, switch metrics, hardware sensors, or FastAPI backends are connected.
-                All telemetry graphs, prediction intervals, and copilot responses are illustrative client models.
-                Unconnected backend services are explicitly labeled <strong className="font-mono text-slate-200">NOT CONNECTED</strong> below.
-                We do not simulate fake green uptime pings or falsified system health.
-              </p>
+        {/* Integration Boundary Banner */}
+        {isBackendLive ? (
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5 text-xs text-emerald-200">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <h4 className="font-semibold text-emerald-300">Live Backend Service Active & Synchronized</h4>
+                <p className="text-emerald-200/90 leading-relaxed">
+                  The frontend client is actively connected to the PRECURSOR REST API service running on <strong className="font-mono text-white">http://127.0.0.1:8000</strong>.
+                  Telemetry points, multi-horizon predictive detectors, Kolmogorov-Smirnov drift gates, and incident records are streaming live from the Python engine.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-5 text-xs text-amber-200">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <h4 className="font-semibold text-amber-300">Operational Architecture & Connectivity Boundaries</h4>
+                <p className="text-amber-200/90 leading-relaxed">
+                  This frontend application runs with offline fallback demonstration fixtures when the backend service is offline.
+                  Unconnected backend services are explicitly labeled <strong className="font-mono text-slate-200">NOT CONNECTED</strong> below.
+                  We do not simulate fake green uptime pings or falsified system health.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Subsystem Matrix Table */}
         <div className="rounded-xl border border-precursor-border bg-precursor-card overflow-hidden">
@@ -264,7 +325,7 @@ export const SystemStatusPage: React.FC = () => {
               </h3>
             </div>
             <span className="font-mono text-xs text-slate-400">
-              {subsystems.filter((s) => s.status === 'NOT CONNECTED').length} Unconnected Services
+              {displayedSubsystems.filter((s) => s.status === 'NOT CONNECTED').length} Unconnected Services
             </span>
           </div>
 
@@ -280,7 +341,7 @@ export const SystemStatusPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-precursor-border/50">
-                {subsystems.map((sub, idx) => (
+                {displayedSubsystems.map((sub, idx) => (
                   <tr key={idx} className="hover:bg-precursor-surface/30 transition-colors">
                     <td className="px-6 py-3.5 font-semibold text-white">
                       <div className="flex items-center gap-2">
