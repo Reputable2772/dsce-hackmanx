@@ -83,6 +83,14 @@ def test_e2e_live_capture_to_analysis_to_llm_action():
         assert claim.metric_id in ("latency_ms", "packet_loss_pct", "jitter_ms", "throughput_mbps", "drops_in", "link_state")
         assert claim.claimed_value is not None
 
+    # Step 7b: Assumption Auditing
+    assert len(copilot.assumptions) > 0
+    for assumption in copilot.assumptions:
+        status_str = assumption.status.value if hasattr(assumption.status, "value") else str(assumption.status)
+        assert status_str in ("VALIDATED", "VIOLATED", "UNTESTABLE")
+        assert len(assumption.statement) > 0
+        assert len(assumption.explanation) > 0
+
     # Step 8: Action & Command Validation
     # Ensure all recommended diagnostic commands are non-empty and invoke standard safe diagnostics
     for cmd in copilot.diagnostic_commands:

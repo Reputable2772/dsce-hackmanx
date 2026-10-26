@@ -73,6 +73,20 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
         path = parsed.path.rstrip("/")
         query = urllib.parse.parse_qs(parsed.query)
 
+        # Auto-discover and register incoming system / client
+        client_ip = self.client_address[0] if self.client_address else "127.0.0.1"
+        user_agent = self.headers.get("User-Agent", "")
+        system_id = self.headers.get("X-System-ID") or self.headers.get("X-Node-ID")
+        try:
+            self.engine.system_registry.register_access(
+                ip_address=client_ip,
+                user_agent=user_agent,
+                endpoint=self.path,
+                system_id=system_id,
+            )
+        except Exception:
+            pass
+
         if path in ("", "/health", "/api/health"):
             self._send_json(200, {
                 "status": "ok",
@@ -214,6 +228,48 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
                 else:
                     self._send_json(404, {"error": "Run archive not found", "run_id": run_id})
 
+            elif path == "/api/incidents/history":
+                source_filter = query.get("source", ["all"])[0]
+                severity_filter = query.get("severity", ["all"])[0]
+                node_filter = query.get("node_id", ["all"])[0]
+                limit = int(query.get("limit", [50])[0])
+                offset = int(query.get("offset", [0])[0])
+                result = self.engine.incident_db.list_incidents(
+                    source=source_filter,
+                    severity=severity_filter,
+                    node_id=node_filter,
+                    limit=limit,
+                    offset=offset,
+                )
+                self._send_json(200, result)
+
+            elif path.startswith("/api/incidents/"):
+                suffix = path.replace("/api/incidents/", "").strip()
+                if "/packets" in suffix:
+                    inc_id = suffix.replace("/packets", "").strip()
+                    limit = int(query.get("limit", [100])[0])
+                    packets = self.engine.incident_db.get_incident_packets(inc_id, limit=limit)
+                    self._send_json(200, {
+                        "incident_id": inc_id,
+                        "count": len(packets),
+                        "packets": packets,
+                    })
+                else:
+                    inc_id = suffix
+                    rec = self.engine.incident_db.get_incident(inc_id)
+                    if rec:
+                        self._send_json(200, rec)
+                    else:
+                        self._send_json(404, {"error": "Incident not found", "id": inc_id})
+
+            elif path in ("/api/topology/systems", "/api/topology"):
+                graph = self.engine.system_registry.get_topology_graph()
+                self._send_json(200, graph)
+
+            elif path in ("/api/systems", "/api/systems/discovered"):
+                systems = self.engine.system_registry.get_systems()
+                self._send_json(200, {"total": len(systems), "systems": systems})
+
             else:
                 self._send_json(404, {"error": "Endpoint not found", "path": path})
 
@@ -222,6 +278,20 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path.rstrip("/")
         body = self._read_json_body()
+
+        # Auto-discover and register incoming system / client
+        client_ip = self.client_address[0] if self.client_address else "127.0.0.1"
+        user_agent = self.headers.get("User-Agent", "")
+        system_id = self.headers.get("X-System-ID") or self.headers.get("X-Node-ID")
+        try:
+            self.engine.system_registry.register_access(
+                ip_address=client_ip,
+                user_agent=user_agent,
+                endpoint=self.path,
+                system_id=system_id,
+            )
+        except Exception:
+            pass
 
         with self.engine_lock:
             if path in ("/api/mode", "/api/mode/set"):
@@ -324,6 +394,19 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
                     "json_path": paths.get("json_path"),
                     "csv_path": paths.get("csv_path"),
                 })
+
+            elif path.startswith("/api/incidents/") and path.endswith("/status"):
+                inc_id = path.replace("/api/incidents/", "").replace("/status", "").strip()
+                new_status = body.get("status", "INVESTIGATING")
+                updated = self.engine.incident_db.update_status(inc_id, new_status)
+                if updated:
+                    self._send_json(200, {
+                        "status": "updated",
+                        "incident_id": inc_id,
+                        "new_status": new_status,
+                    })
+                else:
+                    self._send_json(404, {"error": "Incident not found", "id": inc_id})
 
             else:
                 self._send_json(404, {"error": "Endpoint not found", "path": path})

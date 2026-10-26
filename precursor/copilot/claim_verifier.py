@@ -12,6 +12,12 @@ class ClaimStatus(str, Enum):
     UNVERIFIED = "UNVERIFIED"       # Metric not present in telemetry snapshot or ambiguous
 
 
+class AssumptionStatus(str, Enum):
+    VALIDATED = "VALIDATED"         # Assumption holds true against observed telemetry
+    VIOLATED = "VIOLATED"           # Assumption is contradicted by observed telemetry
+    UNTESTABLE = "UNTESTABLE"       # Metric not present in snapshot or qualitative assumption
+
+
 class ClaimVerification(BaseModel):
     """Result of verifying a single numerical claim from copilot text against ground truth."""
     claim_text: str = Field(..., description="Original extracted claim phrase from LLM output")
@@ -20,6 +26,17 @@ class ClaimVerification(BaseModel):
     actual_value: Optional[float] = Field(None, description="Actual telemetry value in snapshot")
     status: ClaimStatus = Field(..., description="VERIFIED, CONTRADICTED, or UNVERIFIED")
     explanation: str = Field(..., description="Evidence and discrepancy analysis")
+
+
+class AssumptionVerification(BaseModel):
+    """Result of auditing an operational assumption made by the Copilot."""
+    statement: str = Field(..., description="Natural language statement of the assumption")
+    metric_id: Optional[str] = Field(None, description="Matched telemetry metric identifier if quantitative")
+    operator: Optional[str] = Field(None, description="Comparison operator: '<', '<=', '>', '>=', '==', '!='")
+    expected_value: Optional[float] = Field(None, description="Expected threshold or state")
+    actual_value: Optional[float] = Field(None, description="Actual observed value in telemetry snapshot")
+    status: AssumptionStatus = Field(..., description="VALIDATED, VIOLATED, or UNTESTABLE")
+    explanation: str = Field(..., description="Evidence and rationale for validation status")
 
 
 class NumericalClaimVerifier:
@@ -144,3 +161,140 @@ class NumericalClaimVerifier:
                     )
 
         return claims
+
+    def verify_structured_claims(
+        self,
+        structured_claims: List[Dict[str, Any]],
+        telemetry_snapshot: Dict[str, Optional[float]],
+    ) -> List[ClaimVerification]:
+        """Verify explicit structured numerical claims parsed from strict JSON."""
+        claims: List[ClaimVerification] = []
+        for item in structured_claims:
+            metric_id = item.get("metric_id", "")
+            try:
+                claimed_val = float(item.get("asserted_value", item.get("claimed_value", 0.0)))
+            except (ValueError, TypeError):
+                continue
+            unit = item.get("unit", "")
+            context = item.get("context", f"Claimed {metric_id} = {claimed_val}")
+
+            actual_val = telemetry_snapshot.get(metric_id)
+            if actual_val is None:
+                claims.append(
+                    ClaimVerification(
+                        claim_text=context,
+                        metric_id=metric_id,
+                        claimed_value=claimed_val,
+                        actual_value=None,
+                        status=ClaimStatus.UNVERIFIED,
+                        explanation=f"Metric '{metric_id}' not found in active telemetry snapshot.",
+                    )
+                )
+            else:
+                ref = max(abs(actual_val), 1e-4)
+                rel_err = abs(claimed_val - actual_val) / ref
+                if rel_err <= self.tolerance:
+                    status = ClaimStatus.VERIFIED
+                    explanation = (
+                        f"Verified: Claimed {claimed_val}{unit} matches observed {actual_val}{unit} "
+                        f"(diff {round(rel_err * 100, 1)}% <= {int(self.tolerance * 100)}%)."
+                    )
+                else:
+                    status = ClaimStatus.CONTRADICTED
+                    explanation = (
+                        f"Contradicted: Claimed {claimed_val}{unit} differs from observed {actual_val}{unit} "
+                        f"(diff {round(rel_err * 100, 1)}% > {int(self.tolerance * 100)}%)."
+                    )
+                claims.append(
+                    ClaimVerification(
+                        claim_text=context,
+                        metric_id=metric_id,
+                        claimed_value=claimed_val,
+                        actual_value=round(actual_val, 2),
+                        status=status,
+                        explanation=explanation,
+                    )
+                )
+        return claims
+
+    def verify_assumptions(
+        self,
+        assumptions: List[Dict[str, Any]],
+        telemetry_snapshot: Dict[str, Optional[float]],
+    ) -> List[AssumptionVerification]:
+        """Audit operational assumptions made by LLM against ground-truth snapshot."""
+        results: List[AssumptionVerification] = []
+        for item in assumptions:
+            statement = item.get("statement", "")
+            metric_id = item.get("metric_id")
+            op = item.get("operator")
+            exp_val = item.get("expected_value")
+
+            if not metric_id or metric_id not in telemetry_snapshot or telemetry_snapshot[metric_id] is None:
+                results.append(
+                    AssumptionVerification(
+                        statement=statement,
+                        metric_id=metric_id,
+                        operator=op,
+                        expected_value=exp_val,
+                        actual_value=telemetry_snapshot.get(metric_id) if metric_id else None,
+                        status=AssumptionStatus.UNTESTABLE,
+                        explanation=f"Assumption cannot be verified: metric '{metric_id}' is not in active telemetry snapshot." if metric_id else "Qualitative assumption without specific metric condition.",
+                    )
+                )
+                continue
+
+            actual_val = float(telemetry_snapshot[metric_id])
+            if exp_val is None or not op:
+                results.append(
+                    AssumptionVerification(
+                        statement=statement,
+                        metric_id=metric_id,
+                        operator=op,
+                        expected_value=exp_val,
+                        actual_value=actual_val,
+                        status=AssumptionStatus.VALIDATED,
+                        explanation=f"Metric '{metric_id}' is actively monitored (current: {actual_val}).",
+                    )
+                )
+                continue
+
+            # Evaluate operator
+            try:
+                exp_float = float(exp_val)
+            except (ValueError, TypeError):
+                exp_float = 0.0
+
+            is_valid = False
+            if op == "<":
+                is_valid = actual_val < exp_float
+            elif op in ("<=", "=<"):
+                is_valid = actual_val <= exp_float
+            elif op == ">":
+                is_valid = actual_val > exp_float
+            elif op in (">=", "=>"):
+                is_valid = actual_val >= exp_float
+            elif op in ("==", "="):
+                is_valid = abs(actual_val - exp_float) < 1e-3
+            elif op in ("!=", "<>"):
+                is_valid = abs(actual_val - exp_float) >= 1e-3
+            else:
+                is_valid = False
+
+            status = AssumptionStatus.VALIDATED if is_valid else AssumptionStatus.VIOLATED
+            verb = "holds true" if is_valid else "is violated"
+            explanation = (
+                f"Assumption {verb}: observed {metric_id}={actual_val} vs expected condition ({op} {exp_float})."
+            )
+            results.append(
+                AssumptionVerification(
+                    statement=statement,
+                    metric_id=metric_id,
+                    operator=op,
+                    expected_value=round(exp_float, 2),
+                    actual_value=round(actual_val, 2),
+                    status=status,
+                    explanation=explanation,
+                )
+            )
+        return results
