@@ -2,9 +2,8 @@
 
 import os
 import tempfile
-import time
 import pytest
-from precursor.storage.incident_db import IncidentDB, StoredPacketSample
+from precursor.storage.incident_db import IncidentDB
 from precursor.storage.system_registry import SystemRegistry
 from precursor.runner import PrecursorEngine
 from precursor.telemetry.synthetic import ScenarioType

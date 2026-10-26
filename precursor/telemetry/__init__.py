@@ -11,11 +11,11 @@ from precursor.telemetry.synthetic import (
 )
 
 __all__ = [
-    "MetricQuality",
-    "TelemetryPoint",
     "MetricBatch",
-    "TelemetryBuffer",
-    "SyntheticTelemetryGenerator",
-    "SyntheticScenarioConfig",
+    "MetricQuality",
     "ScenarioType",
+    "SyntheticScenarioConfig",
+    "SyntheticTelemetryGenerator",
+    "TelemetryBuffer",
+    "TelemetryPoint",
 ]

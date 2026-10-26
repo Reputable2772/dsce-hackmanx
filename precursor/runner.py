@@ -4,7 +4,6 @@ This module provides the primary interface consumed by the Streamlit dashboard
 and headless evaluation pipelines.
 """
 
-import sys
 import time
 import argparse
 import concurrent.futures
@@ -13,7 +12,7 @@ from typing import Dict, List, Any, Optional, Set
 import numpy as np
 from pydantic import BaseModel, Field
 
-from precursor.telemetry.schema import TelemetryPoint, MetricBatch, MetricQuality
+from precursor.telemetry.schema import TelemetryPoint
 from precursor.telemetry.buffer import TelemetryBuffer
 from precursor.telemetry.live_collector import LiveTelemetryCollector
 from precursor.telemetry.synthetic import (
@@ -24,7 +23,7 @@ from precursor.telemetry.synthetic import (
 from precursor.detectors.registry import DetectorRegistry
 from precursor.detectors.base import DetectorResult
 from precursor.gate.reliability_gate import ReliabilityGate
-from precursor.gate.states import GateDecision, GateState
+from precursor.gate.states import GateDecision
 from precursor.incidents.grouper import IncidentGrouper
 from precursor.incidents.schema import Incident
 from precursor.copilot.runbook_matcher import RunbookMatcher
@@ -523,10 +522,10 @@ def main():
     args = parser.parse_args()
 
     sc_type = ScenarioType(args.scenario)
-    print(f"============================================================")
-    print(f"  PRECURSOR — Reliability-Gated Network Copilot (Headless)")
+    print("============================================================")
+    print("  PRECURSOR — Reliability-Gated Network Copilot (Headless)")
     print(f"  Scenario: {sc_type.value} | Seed: {args.seed} | Steps: {args.steps}")
-    print(f"============================================================\n")
+    print("============================================================\n")
 
     engine = PrecursorEngine(scenario_type=sc_type, seed=args.seed)
 
@@ -537,7 +536,7 @@ def main():
     for k, v in snapshot.latest_telemetry.items():
         print(f"  {k:20s}: {v}")
 
-    print(f"\n--- [2] Reliability Gate Status ---")
+    print("\n--- [2] Reliability Gate Status ---")
     print(f"  State               : {snapshot.gate_decision.state.value}")
     print(f"  Sensor Health Score : {snapshot.gate_decision.sensor_health_score}")
     print(f"  Distribution Drift  : {snapshot.gate_decision.drift_score}")
@@ -562,8 +561,8 @@ def main():
         for c in cr.claims:
             print(f"    * [{c.status.value}] '{c.claim_text}' -> claimed={c.claimed_value}, actual={c.actual_value}")
 
-    print(f"\n============================================================")
-    print(f"  Running Paired Evaluation (GATE ON vs GATE OFF)...")
+    print("\n============================================================")
+    print("  Running Paired Evaluation (GATE ON vs GATE OFF)...")
     comp = engine.run_paired_evaluation(sc_type, seed=args.seed)
     for h in [5, 15]:
         on = comp.gate_on[h]
@@ -571,7 +570,7 @@ def main():
         print(f"  Horizon {h}m:")
         print(f"    GATE ON  -> Recall: {on.event_recall}, FA/hr: {on.false_alarms_per_hour}, Lead Time: {on.average_lead_time_minutes}m, Abstain: {on.abstention_rate}")
         print(f"    GATE OFF -> Recall: {off.event_recall}, FA/hr: {off.false_alarms_per_hour}, Lead Time: {off.average_lead_time_minutes}m, Abstain: {off.abstention_rate}")
-    print(f"============================================================\n")
+    print("============================================================\n")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,5 @@
 """Immediate Failure Detector for zero-latency hard fault detection."""
 
-from typing import Dict, Any, Optional
 
 from precursor.detectors.base import BaseDetector, DetectorResult
 from precursor.telemetry.buffer import TelemetryBuffer

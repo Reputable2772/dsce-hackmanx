@@ -10,9 +10,6 @@ Verifies:
 """
 
 import os
-import json
-import tempfile
-import pytest
 
 from precursor.telemetry.schema import TelemetryPoint, MetricQuality
 from precursor.runner import PrecursorEngine

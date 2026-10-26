@@ -1,7 +1,6 @@
 """Unit tests for PRECURSOR Live Network Mode, live collector, and REST endpoints."""
 
 import time
-import pytest
 from precursor.telemetry.schema import TelemetryPoint, MetricQuality
 from precursor.telemetry.live_collector import LiveTelemetryCollector
 from precursor.runner import PrecursorEngine

@@ -3,4 +3,4 @@
 from .states import GateState, GateDecision
 from .reliability_gate import ReliabilityGate
 
-__all__ = ["GateState", "GateDecision", "ReliabilityGate"]
+__all__ = ["GateDecision", "GateState", "ReliabilityGate"]

@@ -16,9 +16,7 @@ import pytest
 
 from precursor.runner import PrecursorEngine
 from precursor.telemetry.synthetic import ScenarioType
-from precursor.telemetry.schema import TelemetryPoint, MetricQuality
 from precursor.server import create_server
-from precursor.gate.states import GateState
 
 
 @pytest.fixture(scope="module")
@@ -121,7 +119,6 @@ def test_simulate_sensor_malfunction_ks_drift(api_test_server):
     Operator simulates broken/stale sensor readings.
     Verifies Reliability Gate transitions to ABSTAIN and reports drift/quality reasons.
     """
-    engine = api_test_server["engine"]
     base_url = api_test_server["base_url"]
 
     # Reset to sensor degradation scenario where synthetic sensor produces stale/corrupt values
@@ -143,7 +140,6 @@ def test_simulate_dual_stage_copilot_and_status_update(api_test_server):
     Verifies instant heuristic overview (<50ms) and subsequent status update via REST API.
     """
     base_url = api_test_server["base_url"]
-    engine = api_test_server["engine"]
 
     # Trigger fresh incident
     _post_json(f"{base_url}/api/scenario/reset", {"scenario": "gradual_degradation", "seed": 42})

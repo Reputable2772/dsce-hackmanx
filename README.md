@@ -3,7 +3,7 @@
 > **Reliability-Gated Early Warning & Root-Cause Copilot for Critical Network Infrastructure**
 
 [![Nix Flake](https://img.shields.io/badge/nix-flake%20ready-blue.svg)](./flake.nix)
-[![Tests](https://img.shields.io/badge/tests-24%2F24%20passing-brightgreen.svg)](./tests/)
+[![Tests](https://img.shields.io/badge/tests-62%2F62%20passing-brightgreen.svg)](./tests/)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.14-blue.svg)](./requirements.txt)
 [![React](https://img.shields.io/badge/react-19-61dafb.svg)](./package.json)
 [![Three.js](https://img.shields.io/badge/three.js-3D%20topology-black.svg)](./src/)
@@ -154,11 +154,19 @@ The backend exposes an asynchronous REST API on port `8000`:
 | `GET` | `/health` | System health, current simulation/live time, active mode |
 | `GET` | `/api/mode` | Returns active operation mode (`synthetic` or `live`) |
 | `POST` | `/api/mode` | Switch mode: `{"mode": "live", "target_host": "1.1.1.1"}` |
-| `POST` | `/api/telemetry/ingest` | Ingest external batch of `TelemetryPoint` records |
+| `POST` | `/api/telemetry/ingest` | Ingest external batch of `TelemetryPoint` records with node auto-discovery |
 | `GET` | `/api/snapshot` | Fetch latest snapshot (gate decision, detectors, incidents, claims) |
 | `POST` | `/api/step` | Advance timeline by +5 seconds |
 | `POST` | `/api/fast_forward` | Advance timeline by $N$ seconds: `{"seconds": 60.0}` |
 | `POST` | `/api/reset` | Reset scenario: `{"scenario": "sudden_failure", "seed": 42}` |
+| `GET` | `/api/systems` | Hardware inventory and peer health overview |
+| `GET` | `/api/topology/systems` | Dynamic 3D network topology graph nodes & links |
+| `GET` | `/api/incidents/history` | Paginated historical incidents list from SQLite |
+| `GET` | `/api/incidents/{id}` | Full incident envelope with grounded Copilot guidance |
+| `GET` | `/api/incidents/{id}/packets` | Granular forensic packet sampling (TCP/UDP/ICMP/IP/ETH) |
+| `POST` | `/api/incidents/{id}/status` | Update incident lifecycle status (`OPEN`, `INVESTIGATING`, `RESOLVED`) |
+| `POST` | `/api/copilot/query` | User-triggered Copilot query with instant overview and deep LLM hypothesis |
+| `GET` | `/api/evaluation` | Counterfactual paired benchmark evaluation (`gate_on` vs `gate_off`) |
 | `GET` | `/api/export/csv` | Download active telemetry stream as RFC 4180 CSV |
 | `GET` | `/api/export/json` | Download structured nested run archive JSON |
 
@@ -173,7 +181,13 @@ The backend exposes an asynchronous REST API on port `8000`:
 | [`test_storage_export.py`](./tests/test_storage_export.py) | 6 | **PASSED** | UTC ISO 8601 timestamps, CSV fidelity, JSON run archives, local persistence, scenario reproducibility |
 | [`test_live_mode.py`](./tests/test_live_mode.py) | 3 | **PASSED** | Live TCP connect RTT, Linux `/proc/net/dev` interface counters, engine live step, REST ingestion |
 | [`test_integration.py`](./tests/test_integration.py) | 6 | **PASSED** | Multi-horizon incident clustering, paired counterfactual evaluation, REST engine pipeline |
-| **Total** | **24** | **100%** | All tests green |
+| [`test_server_endpoints.py`](./tests/test_server_endpoints.py) | 13 | **PASSED** | Comprehensive REST endpoint integration, lifecycle, simulation controls, copilot queries |
+| [`test_history_and_incidents.py`](./tests/test_history_and_incidents.py) | 6 | **PASSED** | SQLite WAL persistence, deterministic IDs, claim verification, notifications, CSV exports |
+| [`test_incident_db_and_topology.py`](./tests/test_incident_db_and_topology.py) | 3 | **PASSED** | Packet forensics, 3D topology graph schema, REST system endpoints |
+| [`test_systems_api.py`](./tests/test_systems_api.py) | 6 | **PASSED** | Peer registration, live health probing, dynamic system inventory CRUD |
+| [`test_simulation_scenarios.py`](./tests/test_simulation_scenarios.py) | 5 | **PASSED** | Bufferbloat, link cut immediate alert, sensor drift KS test, dual-stage Copilot, custom telemetry injection |
+| [`test_simulation_advanced_situations.py`](./tests/test_simulation_advanced_situations.py) | 5 | **PASSED** | Scenario transitions across all modes, multi-node telemetry discovery, packet fidelity, counterfactual API, 404 validation |
+| **Total** | **62** | **100%** | All 11 test suites passing |
 
 ---
 

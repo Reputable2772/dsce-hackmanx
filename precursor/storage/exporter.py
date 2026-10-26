@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 
 from precursor.telemetry.schema import TelemetryPoint, MetricQuality, DEFAULT_METRIC_UNITS
-from precursor.storage.schema import RunArchive, RunMetadata, FaultEventRecord
+from precursor.storage.schema import RunArchive
 
 DEFAULT_RUNS_DIR = os.environ.get("PRECURSOR_RUNS_DIR", "data/runs")
 DEFAULT_EXPORTS_DIR = os.environ.get("PRECURSOR_EXPORTS_DIR", "data/exports")

@@ -1,17 +1,13 @@
 """Paired Evaluation Benchmark Runner comparing GATE ON vs GATE OFF."""
 
-import os
 from typing import Dict, List, Any, Optional
 import pandas as pd
-import numpy as np
 
-from precursor.telemetry.schema import TelemetryPoint
 from precursor.telemetry.buffer import TelemetryBuffer
 from precursor.telemetry.synthetic import (
     SyntheticTelemetryGenerator,
     SyntheticScenarioConfig,
     ScenarioType,
-    ScenarioGroundTruth,
 )
 from precursor.detectors.registry import DetectorRegistry
 from precursor.gate.reliability_gate import ReliabilityGate

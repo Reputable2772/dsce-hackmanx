@@ -6,11 +6,10 @@ Implements the PRECURSOR target API contract with full versioning (/api and /api
 """
 
 import os
-import sys
 import json
 import time
 import urllib.parse
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 import threading
@@ -18,7 +17,6 @@ import threading
 from precursor.runner import PrecursorEngine, SystemSnapshot
 from precursor.telemetry.schema import TelemetryPoint
 from precursor.telemetry.synthetic import ScenarioType
-from precursor.gate.states import GateState
 from precursor.systems.manager import SystemProbeManager
 
 
@@ -1227,14 +1225,14 @@ def run_server():
     """CLI entrypoint for running the REST API server."""
     host = os.environ.get("PRECURSOR_HOST", "0.0.0.0")
     port = int(os.environ.get("PRECURSOR_PORT", "8000"))
-    print(f"============================================================")
-    print(f"  PRECURSOR REST API Service (CORS enabled)")
+    print("============================================================")
+    print("  PRECURSOR REST API Service (CORS enabled)")
     print(f"  Listening on http://{host}:{port}")
-    print(f"  Endpoints: /health, /ready, /docs, /api/status, /api/topology,")
-    print(f"             /api/telemetry, /api/gate, /api/predictions,")
-    print(f"             /api/incidents, /api/simulation, /api/evaluation,")
-    print(f"             /api/copilot/query, /api/claims/verify, /api/config")
-    print(f"============================================================")
+    print("  Endpoints: /health, /ready, /docs, /api/status, /api/topology,")
+    print("             /api/telemetry, /api/gate, /api/predictions,")
+    print("             /api/incidents, /api/simulation, /api/evaluation,")
+    print("             /api/copilot/query, /api/claims/verify, /api/config")
+    print("============================================================")
     server = create_server(host=host, port=port)
     try:
         server.serve_forever()

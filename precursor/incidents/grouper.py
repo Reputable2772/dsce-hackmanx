@@ -1,6 +1,6 @@
 """Deterministic Spatio-Temporal Incident Grouper for PRECURSOR."""
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict
 from collections import defaultdict
 
 from precursor.detectors.base import DetectorResult

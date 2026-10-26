@@ -10,10 +10,9 @@ Verifies:
 """
 
 import os
-import pytest
 from streamlit.testing.v1 import AppTest
 
-from precursor.runner import PrecursorEngine, SystemSnapshot
+from precursor.runner import PrecursorEngine
 from precursor.telemetry.synthetic import ScenarioType
 from precursor.gate.states import GateState
 

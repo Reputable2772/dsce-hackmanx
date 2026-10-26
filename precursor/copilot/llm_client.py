@@ -13,8 +13,6 @@ from precursor.copilot.claim_verifier import (
     NumericalClaimVerifier,
     ClaimVerification,
     AssumptionVerification,
-    ClaimStatus,
-    AssumptionStatus,
 )
 
 import time

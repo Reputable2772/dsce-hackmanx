@@ -1,7 +1,7 @@
 """Reliability Gate state panel showing PREDICT, DEGRADED, and ABSTAIN factors."""
 
 import streamlit as st
-from typing import Dict, Any, List
+from typing import List
 
 
 def render_gate_panel(

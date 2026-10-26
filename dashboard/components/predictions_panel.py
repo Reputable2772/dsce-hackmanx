@@ -1,7 +1,7 @@
 """Multi-horizon early warning prediction cards (5m, 15m, 30m)."""
 
 import streamlit as st
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 
 def render_predictions_panel(

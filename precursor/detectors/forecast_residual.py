@@ -1,6 +1,5 @@
 """Forecast-Residual Anomaly Detector."""
 
-from typing import Dict, Any, Optional
 import numpy as np
 
 from precursor.detectors.base import BaseDetector, DetectorResult

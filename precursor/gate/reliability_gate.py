@@ -1,12 +1,11 @@
 """Multi-factor Reliability Gate evaluating sensor quality, distribution drift, and residual errors."""
 
-from typing import List, Dict, Any, Optional
+from typing import List, Optional
 import numpy as np
 from scipy.stats import ks_2samp
 
 from precursor.gate.states import GateState, GateDecision
 from precursor.telemetry.buffer import TelemetryBuffer
-from precursor.telemetry.schema import MetricQuality
 
 
 class ReliabilityGate:

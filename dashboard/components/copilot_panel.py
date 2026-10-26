@@ -1,7 +1,7 @@
 """Offline Ollama Copilot diagnosis and Numerical Claim Verifier component."""
 
 import streamlit as st
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 
 
 def render_copilot_panel(
@@ -58,6 +58,11 @@ def render_copilot_panel(
                 st.code(cmd, language="bash")
         else:
             st.caption("No diagnostic actions required.")
+
+        if verification_steps:
+            st.markdown("#### ✅ Verification Steps")
+            for step in verification_steps:
+                st.markdown(f"- {step}")
 
     # Numerical Claim Verifier Table
     st.markdown("---")
