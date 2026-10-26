@@ -28,7 +28,7 @@ const navItems: NavItem[] = [
   { name: 'Predictions', path: '/predictions', icon: Zap },
   { name: 'Incidents', path: '/incidents', icon: AlertOctagon },
   { name: 'Copilot', path: '/copilot', icon: Bot },
-  { name: 'Research', path: '/research', icon: FlaskConical },
+  { name: 'Simulation Lab', path: '/simulation', icon: FlaskConical },
   { name: 'System Status', path: '/status', icon: Server },
 ];
 

@@ -5,7 +5,7 @@ import { TelemetryPage } from '@/features/telemetry/TelemetryPage';
 import { PredictionsPage } from '@/features/predictions/PredictionsPage';
 import { IncidentsPage } from '@/features/incidents/IncidentsPage';
 import { CopilotPage } from '@/features/copilot/CopilotPage';
-import { ResearchPage } from '@/features/research/ResearchPage';
+import { SimulationLabPage } from '@/features/simulation/SimulationLabPage';
 import { SystemStatusPage } from '@/features/system-status/SystemStatusPage';
 
 export const router = createBrowserRouter([
@@ -34,8 +34,8 @@ export const router = createBrowserRouter([
         element: <CopilotPage />,
       },
       {
-        path: 'research',
-        element: <ResearchPage />,
+        path: 'simulation',
+        element: <SimulationLabPage />,
       },
       {
         path: 'status',
