@@ -1,5 +1,34 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production build artifacts
+dist/
+build/
+tsconfig.tsbuildinfo
+
+# Python artifacts & virtual environments
 .venv/
+env/
+venv/
+.Python
 __pycache__/
 *.pyc
+*.py[cod]
+*$py.class
+*.so
 .pytest_cache/
 .streamlit/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
