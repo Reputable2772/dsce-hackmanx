@@ -5,13 +5,8 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 
-from precursor.telemetry.schema import MetricQuality, TelemetryPoint
-from precursor.telemetry.buffer import TelemetryBuffer
-from precursor.telemetry.synthetic import (
-    SyntheticTelemetryGenerator,
-    SyntheticScenarioConfig,
-    ScenarioType,
-)
+from precursor.runner import PrecursorEngine, SystemSnapshot
+from precursor.telemetry.synthetic import ScenarioType
 from precursor.telemetry.live_collector import LiveTelemetryCollector
 
 from dashboard.theme import CUSTOM_CSS
@@ -34,21 +29,16 @@ st.set_page_config(
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # 3. Session State Initialization
-if "buffer" not in st.session_state:
-    st.session_state.buffer = TelemetryBuffer(max_points=50000)
-
-if "generator" not in st.session_state:
-    cfg = SyntheticScenarioConfig(scenario_type=ScenarioType.GRADUAL_DEGRADATION, seed=42)
-    st.session_state.generator = SyntheticTelemetryGenerator(cfg)
+if "engine" not in st.session_state:
+    st.session_state.engine = PrecursorEngine(
+        scenario_type=ScenarioType.GRADUAL_DEGRADATION,
+        seed=42,
+        interface_id="eth0",
+    )
     st.session_state.current_scenario = ScenarioType.GRADUAL_DEGRADATION.value
-
-if "sim_steps" not in st.session_state:
-    st.session_state.sim_steps = 0
-    # Seed initial 30 steps so charts immediately show nominal baseline
-    for _ in range(30):
-        batch = st.session_state.generator.step()
-        st.session_state.buffer.add_batch(batch.points)
-        st.session_state.sim_steps += 1
+    # Seed initial 25 steps (125s) so charts and baselines are populated
+    st.session_state.snapshot = st.session_state.engine.fast_forward(125.0)
+    st.session_state.sim_steps = 25
 
 if "collector" not in st.session_state:
     st.session_state.collector = LiveTelemetryCollector()
@@ -80,43 +70,31 @@ with st.sidebar:
         # Reset if scenario changed
         if st.session_state.current_scenario != selected_type.value:
             st.session_state.current_scenario = selected_type.value
-            st.session_state.buffer.clear()
-            cfg = SyntheticScenarioConfig(scenario_type=selected_type, seed=42)
-            st.session_state.generator = SyntheticTelemetryGenerator(cfg)
-            st.session_state.sim_steps = 0
-            for _ in range(25):
-                batch = st.session_state.generator.step()
-                st.session_state.buffer.add_batch(batch.points)
-                st.session_state.sim_steps += 1
+            st.session_state.engine.reset_scenario(selected_type, seed=42)
+            st.session_state.snapshot = st.session_state.engine.fast_forward(125.0)
+            st.session_state.sim_steps = 25
             st.rerun()
 
-        st.caption(st.session_state.generator.ground_truth.description)
+        st.caption(st.session_state.engine.generator.ground_truth.description)
 
         st.markdown("---")
         st.markdown("#### ⏯️ Time-Travel Controls")
         col_btn1, col_btn2, col_btn3 = st.columns(3)
         with col_btn1:
-            if st.button("Step +5s", use_container_width=True):
-                batch = st.session_state.generator.step(5.0)
-                st.session_state.buffer.add_batch(batch.points)
+            if st.button("Step +5s", width="stretch"):
+                st.session_state.snapshot = st.session_state.engine.step_simulation()
                 st.session_state.sim_steps += 1
                 st.rerun()
         with col_btn2:
-            if st.button("Jump +1m", use_container_width=True):
-                for _ in range(12):
-                    batch = st.session_state.generator.step(5.0)
-                    st.session_state.buffer.add_batch(batch.points)
-                    st.session_state.sim_steps += 1
+            if st.button("Jump +1m", width="stretch"):
+                st.session_state.snapshot = st.session_state.engine.fast_forward(60.0)
+                st.session_state.sim_steps += 12
                 st.rerun()
         with col_btn3:
-            if st.button("Reset", use_container_width=True):
-                st.session_state.buffer.clear()
-                st.session_state.generator.reset()
-                st.session_state.sim_steps = 0
-                for _ in range(25):
-                    batch = st.session_state.generator.step()
-                    st.session_state.buffer.add_batch(batch.points)
-                    st.session_state.sim_steps += 1
+            if st.button("Reset", width="stretch"):
+                st.session_state.engine.reset_scenario(selected_type, seed=42)
+                st.session_state.snapshot = st.session_state.engine.fast_forward(125.0)
+                st.session_state.sim_steps = 25
                 st.rerun()
 
         st.markdown("---")
@@ -129,9 +107,10 @@ with st.sidebar:
         st.number_input("Target Port", value=80, min_value=1, max_value=65535)
         st.text_input("Interface ID", value="eth0")
 
-        if st.button("Poll Live Now", use_container_width=True):
+        if st.button("Poll Live Now", width="stretch"):
             live_batch = st.session_state.collector.collect()
-            st.session_state.buffer.add_batch(live_batch.points)
+            st.session_state.snapshot = st.session_state.engine.ingest_points(live_batch.points)
+            st.session_state.sim_steps += 1
             st.rerun()
 
     st.markdown("---")
@@ -140,88 +119,41 @@ with st.sidebar:
 
 # Continuous Playback Loop Handler
 if st.session_state.is_auto_playing and mode == "Synthetic Replay":
-    batch = st.session_state.generator.step(5.0)
-    st.session_state.buffer.add_batch(batch.points)
+    st.session_state.snapshot = st.session_state.engine.step_simulation()
     st.session_state.sim_steps += 1
     time.sleep(0.5)
     st.rerun()
 
-# 5. Extract Recent Metrics & Compute Diagnostics
-df_all = st.session_state.buffer.get_df()
-latest_metrics = {}
-link_is_up = True
+# 5. Extract Recent Metrics & Compute Diagnostics from PrecursorEngine
+snapshot: SystemSnapshot = st.session_state.snapshot
+df_all = st.session_state.engine.buffer.get_df()
+latest_metrics = snapshot.latest_telemetry
+link_is_up = bool(latest_metrics.get("link_state") is None or latest_metrics.get("link_state", 1.0) > 0.5)
 
-if not df_all.empty:
-    for m in ["latency_ms", "jitter_ms", "packet_loss_pct", "throughput_mbps", "drops_in", "link_state"]:
-        subset = df_all[df_all["metric_id"] == m]
-        if not subset.empty:
-            val = subset.iloc[-1]["value"]
-            latest_metrics[m] = val
-            if m == "link_state" and val is not None:
-                link_is_up = bool(val > 0.5)
+# Reliability Gate Decision
+gate_decision = snapshot.gate_decision
+gate_state = gate_decision.state.value
+gate_reasons = gate_decision.reasons
+sensor_health_score = gate_decision.sensor_health_score
+drift_score = gate_decision.drift_score
+residual_score = gate_decision.residual_error_score
 
-# Calculate Quality & Reliability Gate State
-q_stats = st.session_state.buffer.quality_stats(window_seconds=300.0)
-good_ratio = q_stats["good_ratio"]
-missing_ratio = q_stats["missing_ratio"]
-stale_ratio = q_stats["stale_ratio"]
-
-# Gate state evaluation logic
-gate_reasons = []
-gate_state = "PREDICT"
-drift_score = 0.04
-residual_score = 0.03
-
-# Check sensor corruption (ABSTAIN)
-if missing_ratio + stale_ratio > 0.40:
-    gate_state = "ABSTAIN"
-    gate_reasons.append(f"Excessive sensor corruption: {(missing_ratio+stale_ratio)*100:.1f}% missing/stale telemetry")
-elif missing_ratio + stale_ratio > 0.15:
-    gate_state = "DEGRADED"
-    gate_reasons.append(f"Moderate sensor drop rate: {(missing_ratio+stale_ratio)*100:.1f}% unconfirmed samples")
-
-# Check drift in latency
-rtt_recent = latest_metrics.get("latency_ms")
-if rtt_recent is not None and rtt_recent > 40.0:
-    drift_score = min(0.95, (rtt_recent - 22.0) / 80.0)
-    residual_score = min(0.92, drift_score * 0.85)
-    if drift_score > 0.70 and gate_state == "PREDICT":
-        gate_state = "DEGRADED"
-        gate_reasons.append(f"High statistical drift: variance shift score {drift_score:.2f}")
-
-# Multi-Horizon Prediction Generation
+# Multi-Horizon Prediction Mapping
 sim_elapsed_min = (st.session_state.sim_steps * 5.0) / 60.0
 predictions = {}
-
-# 5m horizon
-pred_5m = bool(rtt_recent is not None and (rtt_recent > 55.0 or not link_is_up))
-predictions[5] = {
-    "predicted_impact": pred_5m,
-    "is_sustained": bool(rtt_recent is not None and rtt_recent > 65.0),
-    "raw_score": 0.88 if pred_5m else 0.12,
-    "lead_time_min": 4.5 if pred_5m else 0.0,
-    "evidence": f"RTT creeping at {rtt_recent:.1f}ms (> SLA threshold trend)" if rtt_recent else "",
-}
-
-# 15m horizon
-pred_15m = bool(rtt_recent is not None and (rtt_recent > 42.0 or not link_is_up))
-predictions[15] = {
-    "predicted_impact": pred_15m,
-    "is_sustained": bool(rtt_recent is not None and rtt_recent > 50.0),
-    "raw_score": 0.76 if pred_15m else 0.08,
-    "lead_time_min": 12.8 if pred_15m else 0.0,
-    "evidence": f"EWMA variance band expanded by 2.4x baseline" if pred_15m else "",
-}
-
-# 30m horizon
-pred_30m = bool(rtt_recent is not None and (rtt_recent > 32.0 or not link_is_up))
-predictions[30] = {
-    "predicted_impact": pred_30m,
-    "is_sustained": bool(rtt_recent is not None and rtt_recent > 38.0),
-    "raw_score": 0.62 if pred_30m else 0.05,
-    "lead_time_min": 24.2 if pred_30m else 0.0,
-    "evidence": f"Forecast-Residual trend projects SLA crossing at T+22min" if pred_30m else "",
-}
+for h in [5, 15, 30]:
+    h_results = snapshot.detector_results.get(h, [])
+    pred_impact = any(r.predicted_impact for r in h_results)
+    is_sustained = any(r.is_sustained for r in h_results)
+    max_score = max((r.raw_score for r in h_results), default=0.0)
+    evidences = [str(r.evidence) for r in h_results if r.evidence and r.predicted_impact]
+    predictions[h] = {
+        "predicted_impact": pred_impact,
+        "is_sustained": is_sustained,
+        "raw_score": round(max_score, 2),
+        "lead_time_min": float(h) * 0.9 if pred_impact else 0.0,
+        "evidence": " | ".join(evidences) if evidences else "Nominal operating telemetry",
+    }
 
 # 6. Header Banner
 st.markdown(
@@ -271,7 +203,7 @@ with tab1:
         render_gate_panel(
             gate_state=gate_state,
             reasons=gate_reasons,
-            sensor_health_score=good_ratio,
+            sensor_health_score=sensor_health_score,
             drift_score=drift_score,
             residual_error_score=residual_score,
             immediate_alerts_active=True,
@@ -282,104 +214,126 @@ with tab1:
 
 # Tab 2: Offline Copilot & Claim Verifier
 with tab2:
-    # Build dynamic Copilot content based on current telemetry state
-    rtt_val = latest_metrics.get("latency_ms", 22.0)
-    loss_val = latest_metrics.get("packet_loss_pct", 0.0)
-
-    if not link_is_up:
-        copilot_summary = "CRITICAL: Physical fiber or interface link drop detected on eth0. Traffic blackholed. Immediate failover required."
-        hypotheses = ["Physical cable disconnect / cut", "Transceiver laser failure / link partner down", "Kernel NIC driver crash"]
-        commands = ["ip link show dev eth0", "ethtool eth0", "dmesg -T | grep -i eth0"]
-        claims = [
-            {"claim_text": "Link state dropped to 0 (DOWN)", "claimed_value": "0", "actual_value": 0.0, "status": "VERIFIED", "explanation": "Matches link_state telemetry point exactly."},
-            {"claim_text": "Packet loss escalated to 100%", "claimed_value": "100%", "actual_value": 100.0, "status": "VERIFIED", "explanation": "Confirmed full loss window."},
-        ]
-    elif rtt_val and rtt_val > sla_threshold:
-        copilot_summary = f"WARNING: Developing buffer bloat and queue buildup detected. Latency has climbed to {rtt_val:.1f}ms, breaching the {sla_threshold}ms SLA limit."
-        hypotheses = ["Egress queue saturation / CoDel buffer bloat", "Upstream ISP transit congestion", "TCP window scaling stall"]
-        commands = ["tc -s qdisc show dev eth0", "ss -s", "mtr -rzw -c 10 10.0.0.1"]
-        claims = [
-            {"claim_text": f"Latency reached {rtt_val:.1f}ms", "claimed_value": f"{rtt_val:.1f}ms", "actual_value": rtt_val, "status": "VERIFIED", "explanation": "Matches rolling window median."},
-            {"claim_text": f"Packet loss reached 45%", "claimed_value": "45%", "actual_value": loss_val, "status": "CONTRADICTED", "explanation": f"Telemetry reflects {loss_val:.1f}% loss, not 45% (hallucination guarded)."},
-            {"claim_text": "BGP peer flap count is 14", "claimed_value": "14", "actual_value": None, "status": "UNVERIFIED", "explanation": "BGP peer flap metric is not present in the current telemetry batch."},
-        ]
+    if snapshot.copilot_response:
+        cr = snapshot.copilot_response
+        copilot_dict = {
+            "summary": cr.summary,
+            "hypotheses": cr.hypotheses,
+            "diagnostic_commands": cr.diagnostic_commands,
+            "verification_steps": cr.verification_steps,
+            "risks_and_rollback": cr.risks_and_rollback,
+            "claims": [c.model_dump() for c in cr.claims],
+        }
+        matches = []
+        if snapshot.incidents:
+            matches = st.session_state.engine.matcher.match(snapshot.incidents[0], top_k=1)
+        runbook_title = matches[0].title if matches else "Network Performance & SLA Mitigation"
+        runbook_content = matches[0].content if matches else "### Operational Runbook\nFollow standard triage procedures."
     else:
-        copilot_summary = "Nominal network operating state. Latency, loss, and jitter are well within defined operational parameters."
-        hypotheses = ["Normal steady-state background traffic"]
-        commands = ["ping -c 3 10.0.0.1"]
-        claims = [
-            {"claim_text": f"Latency is stable at {rtt_val:.1f}ms", "claimed_value": f"{rtt_val:.1f}ms", "actual_value": rtt_val, "status": "VERIFIED", "explanation": "Matches observed average within ±1.5%."},
-        ]
-
-    runbook_title = "Buffer Bloat & Queue Congestion Mitigation"
-    runbook_body = """
-### Runbook: RFC 8289 Buffer Bloat Mitigation
-1. **Diagnosis**: Run `tc -s qdisc show dev eth0` to inspect queue backlog and drop counters.
-2. **Immediate Remediation**: Switch egress qdisc from default pfifo_fast to FQ_CoDel or CAKE:
-   ```bash
-   sudo tc qdisc replace dev eth0 root fq_codel
-   ```
-3. **Verification**: Confirm latency returns below 30ms under load via `mtr` or `iperf3`.
-4. **Rollback**: Restore default qdisc:
-   ```bash
-   sudo tc qdisc del dev eth0 root
-   ```
+        rtt_curr = latest_metrics.get("latency_ms", 22.0)
+        copilot_dict = {
+            "summary": f"Nominal network operating state. Current latency is {rtt_curr:.1f}ms, within operational parameters.",
+            "hypotheses": ["Normal steady-state background traffic"],
+            "diagnostic_commands": ["ping -c 3 1.1.1.1", "ip -s link show dev eth0"],
+            "verification_steps": ["Confirm latency and packet loss remain below SLA threshold"],
+            "risks_and_rollback": ["Diagnostic commands are read-only and carry zero operational risk."],
+            "claims": [
+                {
+                    "claim_text": f"Latency is stable at {rtt_curr:.1f}ms",
+                    "claimed_value": f"{rtt_curr:.1f}ms",
+                    "actual_value": rtt_curr,
+                    "status": "VERIFIED",
+                    "explanation": "Observed value aligns with recent rolling telemetry.",
+                }
+            ],
+        }
+        runbook_title = "Steady-State Operational Baseline"
+        runbook_content = """### Runbook: Nominal Operating Baseline
+1. **Verification**: Confirm network interfaces reflect `UP` status.
+2. **Monitoring**: Maintain continuous polling of EWMA and Forecast-Residual bands.
 """
 
     render_copilot_panel(
-        copilot_data={
-            "summary": copilot_summary,
-            "hypotheses": hypotheses,
-            "diagnostic_commands": commands,
-            "risks_and_rollback": ["Applying traffic control qdisc rules may drop transient in-flight bursts during re-initialization."],
-            "claims": claims,
-        },
+        copilot_data=copilot_dict,
         runbook_title=runbook_title,
-        runbook_content=runbook_body,
+        runbook_content=runbook_content,
     )
 
 # Tab 3: Paired Evaluation
 with tab3:
-    render_evaluation_panel()
+    if "eval_cache" not in st.session_state:
+        st.session_state.eval_cache = {}
+
+    if selected_type.value not in st.session_state.eval_cache:
+        st.session_state.eval_cache[selected_type.value] = st.session_state.engine.run_paired_evaluation(selected_type, seed=42)
+
+    comparison = st.session_state.eval_cache[selected_type.value]
+    on_15 = comparison.gate_on.get(15) or comparison.gate_on.get(5)
+    off_15 = comparison.gate_off.get(15) or comparison.gate_off.get(5)
+    if on_15 and off_15:
+        eval_data = {
+            "gate_off": {
+                "recall_pct": round(off_15.event_recall * 100.0, 1),
+                "false_alarms_per_hr": round(off_15.false_alarms_per_hour, 1),
+                "lead_time_min": round(off_15.average_lead_time_minutes, 1),
+                "missed_faults": off_15.missed_faults,
+                "abstention_rate_pct": round(off_15.abstention_rate * 100.0, 1),
+            },
+            "gate_on": {
+                "recall_pct": round(on_15.event_recall * 100.0, 1),
+                "false_alarms_per_hr": round(on_15.false_alarms_per_hour, 1),
+                "lead_time_min": round(on_15.average_lead_time_minutes, 1),
+                "missed_faults": on_15.missed_faults,
+                "abstention_rate_pct": round(on_15.abstention_rate * 100.0, 1),
+            },
+        }
+    else:
+        eval_data = None
+
+    render_evaluation_panel(eval_data=eval_data)
 
 # Tab 4: Clustered Incidents & Topology
 with tab4:
     st.subheader("🗂️ Active Incident Bundles & Topological Grouping")
     st.caption("Incidents deterministically grouped across interfaces and co-occurring telemetry signals.")
 
-    col_inc1, col_inc2 = st.columns(2)
-    with col_inc1:
-        st.markdown(
-            f"""
-            <div class="kpi-card" style="margin-bottom: 0.75rem;">
-                <div style="display: flex; justify-content: space-between;">
-                    <span style="font-weight: 700; color: #F8FAFC;">INC-001: Egress Degradation eth0</span>
-                    <span style="color: #F59E0B; font-weight: 600; font-size: 0.8rem;">WARNING</span>
-                </div>
-                <div style="font-size: 0.85rem; color: #94A3B8; margin-top: 0.5rem;">
-                    Co-occurring Signals: <code>latency_ms</code>, <code>packet_loss_pct</code>, <code>drops_in</code>
-                </div>
-                <div style="font-size: 0.8rem; color: #CBD5E1; margin-top: 0.5rem;">
-                    Gate State: <strong>{gate_state}</strong> | Horizon: <strong>15m</strong>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with col_inc2:
+    if snapshot.incidents:
+        cols = st.columns(min(len(snapshot.incidents), 2))
+        for idx, inc in enumerate(snapshot.incidents):
+            col_target = cols[idx % len(cols)]
+            with col_target:
+                sev_val = inc.severity.value if hasattr(inc.severity, "value") else str(inc.severity)
+                sev_color = "#EF4444" if sev_val == "CRITICAL" else "#F59E0B" if sev_val == "WARNING" else "#3B82F6"
+                type_label = "ACTIVE FAULT" if inc.is_active_fault else f"PREDICTED ({inc.predicted_horizon_minutes}m)"
+                evidence_text = ", ".join(f"{k}: {v}" for k, v in inc.evidence_summary.items()) if inc.evidence_summary else "Anomalous telemetry breach detected"
+                st.markdown(
+                    f"""
+                    <div class="kpi-card" style="margin-bottom: 0.75rem;">
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="font-weight: 700; color: #F8FAFC;">{inc.id}: {inc.title}</span>
+                            <span style="color: {sev_color}; font-weight: 600; font-size: 0.8rem;">{sev_val}</span>
+                        </div>
+                        <div style="font-size: 0.85rem; color: #94A3B8; margin-top: 0.5rem;">
+                            Type: <strong>{type_label}</strong> | Status: <strong>{inc.status}</strong>
+                        </div>
+                        <div style="font-size: 0.85rem; color: #94A3B8; margin-top: 0.25rem;">
+                            Co-occurring Signals: {", ".join(f"<code>{m}</code>" for m in inc.primary_metrics)}
+                        </div>
+                        <div style="font-size: 0.8rem; color: #CBD5E1; margin-top: 0.5rem;">
+                            Evidence: {evidence_text}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+    else:
         st.markdown(
             """
-            <div class="kpi-card" style="margin-bottom: 0.75rem;">
-                <div style="display: flex; justify-content: space-between;">
-                    <span style="font-weight: 700; color: #F8FAFC;">INC-002: Gateway Probe Unicast RTT</span>
-                    <span style="color: #34D399; font-weight: 600; font-size: 0.8rem;">MONITORED</span>
-                </div>
-                <div style="font-size: 0.85rem; color: #94A3B8; margin-top: 0.5rem;">
-                    Co-occurring Signals: <code>rtt_ms</code>, <code>jitter_ms</code>
-                </div>
-                <div style="font-size: 0.8rem; color: #CBD5E1; margin-top: 0.5rem;">
-                    Gate State: <strong>PREDICT</strong> | Horizon: <strong>30m</strong>
+            <div class="kpi-card" style="text-align: center; padding: 2rem;">
+                <span style="font-size: 1.5rem;">✅</span>
+                <div style="color: #34D399; font-weight: 600; margin-top: 0.5rem;">Nominal Operating State</div>
+                <div style="font-size: 0.85rem; color: #94A3B8; margin-top: 0.25rem;">
+                    Zero active outages or early warning predictions detected.
                 </div>
             </div>
             """,
