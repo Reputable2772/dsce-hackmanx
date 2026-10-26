@@ -6,14 +6,17 @@ import { useSimulationStore } from './useSimulationStore';
 import { ScenarioCard } from './components/ScenarioCard';
 import { SimulationConfigPanel } from './components/SimulationConfigPanel';
 import { TimelineViewer } from './components/TimelineViewer';
+import { LiveProbeMonitor } from './components/LiveProbeMonitor';
 import { GateComparisonPanel } from './components/GateComparisonPanel';
 import { EvaluationDashboard } from './components/EvaluationDashboard';
 import { GateEducationPanel } from './components/GateEducationPanel';
+import { useAppStore } from '@/stores/useAppStore';
 
 type ActiveTab = 'simulation' | 'evaluation' | 'gate-guide';
 
 export const SimulationLabPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('simulation');
+  const operatingMode = useAppStore((s) => s.operatingMode);
   const { config, evaluation, setScenario } = useSimulationStore();
 
   const tabs: { id: ActiveTab; label: string; icon: React.ElementType }[] = [
@@ -61,30 +64,32 @@ export const SimulationLabPage: React.FC = () => {
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
-              <TimelineViewer />
+              {operatingMode === 'live' ? <LiveProbeMonitor /> : <TimelineViewer />}
             </div>
             <div>
               <SimulationConfigPanel />
             </div>
           </div>
 
-          {evaluation && <GateComparisonPanel comparison={evaluation} />}
+          {operatingMode !== 'live' && evaluation && <GateComparisonPanel comparison={evaluation} />}
 
-          <div>
-            <h3 className="mb-3 font-mono text-xs font-bold uppercase tracking-wider text-[#687386]">
-              Deterministic Failure Scenarios
-            </h3>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {scenarioDefinitions.map((scenario) => (
-                <ScenarioCard
-                  key={scenario.id}
-                  scenario={scenario}
-                  isSelected={config.scenarioId === scenario.id}
-                  onSelect={setScenario}
-                />
-              ))}
+          {operatingMode !== 'live' && (
+            <div>
+              <h3 className="mb-3 font-mono text-xs font-bold uppercase tracking-wider text-[#687386]">
+                Deterministic Failure Scenarios
+              </h3>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {scenarioDefinitions.map((scenario) => (
+                  <ScenarioCard
+                    key={scenario.id}
+                    scenario={scenario}
+                    isSelected={config.scenarioId === scenario.id}
+                    onSelect={setScenario}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 

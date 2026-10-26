@@ -33,7 +33,11 @@ export const NetworkNode3D: React.FC<NetworkNode3DProps> = ({
     offline: '#64748B',   // Slate
   };
 
-  const baseColor = statusColors[node.status] || '#45D6B5';
+  const isInboundPeer = node.id === 'inbound-peer' || node.name.toLowerCase().includes('inbound');
+  const isOutboundTarget = node.id === 'outbound-target' || node.id.startsWith('target-') || node.name.toLowerCase().includes('probe target');
+  const roleColor = isInboundPeer ? '#06B6D4' : isOutboundTarget ? '#10B981' : null;
+
+  const baseColor = roleColor || statusColors[node.status] || '#45D6B5';
   const effectiveColor = isSelected ? '#9B7BFF' : (internalHover || isHovered) ? '#48DDF5' : baseColor;
 
   // Gentle animation for pulse ring and ambient node breathing

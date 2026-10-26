@@ -145,10 +145,15 @@ export const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({
               <span>ID: <span className="text-[#5267D8] font-semibold">{selectedNode.id}</span></span>
               <span>•</span>
               <span className="inline-flex items-center gap-1">
-                {isLiveTarget || isLiveProbe ? (
+                {selectedNode.id === 'inbound-peer' || selectedNode.name.toLowerCase().includes('inbound') || selectedNode.name.toLowerCase().includes('peer source') ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300 bg-cyan-50 px-2.5 py-0.5 text-[10px] font-mono font-bold text-cyan-800 shadow-xs animate-pulse">
+                    <span className="h-1.5 w-1.5 rounded-full bg-cyan-600" />
+                    INBOUND ICMP PEER (172.25.80.33)
+                  </span>
+                ) : isLiveTarget || isLiveProbe || selectedNode.id === 'outbound-target' ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-mono font-bold text-emerald-800 shadow-xs animate-pulse">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
-                    LIVE PROBE TARGET
+                    OUTBOUND PROBE TARGET
                   </span>
                 ) : isLocalHost ? (
                   <span className="rounded bg-indigo-50 text-[#5267D8] px-1.5 py-0.5 text-[10px] font-semibold">
