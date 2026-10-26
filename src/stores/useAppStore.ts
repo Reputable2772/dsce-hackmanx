@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { GateState, ConnectionState, DemoMode } from '@/types';
 import { apiClient } from '@/lib/api';
 
+import { useSettingsStore } from './useSettingsStore';
+
 interface AppStoreState {
   connectionState: ConnectionState;
   gateState: GateState;
@@ -34,7 +36,14 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   backendVersion: null,
   lastSyncTimestamp: null,
 
-  setDemoMode: (demoMode) => set({ demoMode }),
+  setDemoMode: (demoMode) => {
+    set({ demoMode });
+    try {
+      useSettingsStore.getState().setDemoMode(demoMode);
+    } catch {
+      // Ignore if circular initialization
+    }
+  },
   setSelectedNodeId: (selectedNodeId) => set({ selectedNodeId }),
   setSelectedIncidentId: (selectedIncidentId) => set({ selectedIncidentId }),
   setActiveScenario: (activeScenario) => set({ activeScenario }),
