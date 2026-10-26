@@ -106,13 +106,19 @@ export function useBreachNotifications() {
         for (const ev of res.events) {
           if (!seenIdsRef.current.has(ev.id)) {
             seenIdsRef.current.add(ev.id);
-            if (ev.severity === 'CRITICAL' || ev.severity === 'WARNING' || ev.event_type === 'GATE_STATE_TRANSITION') {
+            const sevStr = String(ev.severity || '').toUpperCase();
+            const isCritical = sevStr.includes('CRITICAL') || sevStr.includes('HIGH');
+            const isWarning = sevStr.includes('WARNING') || sevStr.includes('MEDIUM');
+            const isAlertEvent = isCritical || isWarning || ev.event_type === 'GATE_STATE_TRANSITION' || String(ev.event_type || '').includes('INCIDENT');
+
+            if (isAlertEvent) {
+              const normalizedSeverity: 'CRITICAL' | 'WARNING' | 'INFO' = isCritical ? 'CRITICAL' : isWarning ? 'WARNING' : 'INFO';
               triggerAlert({
                 id: ev.id,
                 timestamp: ev.timestamp,
                 title: ev.title,
                 message: ev.message,
-                severity: ev.severity,
+                severity: normalizedSeverity,
                 eventType: ev.event_type,
                 relatedIncidentId: ev.related_incident_id,
               });

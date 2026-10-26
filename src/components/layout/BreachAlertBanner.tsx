@@ -32,8 +32,13 @@ export const BreachAlertBanner: React.FC = () => {
 
   useEffect(() => {
     if (activeAlert) {
-      setExpanded(false);
-      setCopilotData(null);
+      // Auto-expand on critical alert for instant AI guidance visibility
+      if (activeAlert.severity === 'CRITICAL') {
+        setExpanded(true);
+      } else {
+        setExpanded(false);
+      }
+      fetchCopilotGuidance();
     }
   }, [activeAlert?.id]);
 
