@@ -322,7 +322,11 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
                 ingested = []
                 for p in raw_points:
                     try:
-                        ingested.append(TelemetryPoint(**p))
+                        if isinstance(p, dict):
+                            p_copy = dict(p)
+                            if "quality" in p_copy and isinstance(p_copy["quality"], str):
+                                p_copy["quality"] = p_copy["quality"].lower()
+                            ingested.append(TelemetryPoint(**p_copy))
                     except Exception:
                         pass
                 if ingested:

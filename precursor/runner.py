@@ -7,8 +7,9 @@ and headless evaluation pipelines.
 import sys
 import time
 import argparse
+import concurrent.futures
 from datetime import datetime, timezone
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Set
 import numpy as np
 from pydantic import BaseModel, Field
 
@@ -90,6 +91,10 @@ class PrecursorEngine:
         self.incident_db = IncidentDB()
         self.system_registry = SystemRegistry()
 
+        # Asynchronous background LLM executor (Solution 1)
+        self._llm_executor = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="precursor-llm")
+        self._in_flight_incidents: Set[str] = set()
+
         # Ingestion Mode: "synthetic" (default) or "live"
         self.mode: str = "synthetic"
         self.live_collector: Optional[LiveTelemetryCollector] = None
@@ -163,6 +168,17 @@ class PrecursorEngine:
     def ingest_points(self, points: List[TelemetryPoint]) -> SystemSnapshot:
         """Ingest live or external points and compute the full state pipeline."""
         self.buffer.add_batch(points)
+        for pt in points:
+            if pt.node_id and pt.node_id not in ("sys-core-engine", "gateway-01"):
+                node_type = "switch" if "switch" in pt.node_id else ("router" if "router" in pt.node_id else "server")
+                self.system_registry.register_node(
+                    node_id=pt.node_id,
+                    name=pt.node_id.replace("-", " ").title(),
+                    node_type=node_type,
+                    ip_address=pt.labels.get("ip", "10.0.0.1"),
+                    status="healthy" if (hasattr(pt.quality, "value") and pt.quality.value == "good") or pt.quality == "good" else "degraded",
+                    metrics={pt.metric_id: pt.value},
+                )
         t_now = self.buffer.get_latest_timestamp() or self.config.start_timestamp
         return self._evaluate_pipeline(t_now)
 
@@ -210,7 +226,28 @@ class PrecursorEngine:
         if incidents:
             top_incident = sorted(incidents, key=lambda i: (i.severity == "CRITICAL", not i.is_active_fault), reverse=True)[0]
             matches = self.matcher.match(top_incident, top_k=2)
-            copilot_response = self.copilot.explain_and_recommend(top_incident, latest_telem, matches)
+            
+            # Solution 1: Sub-5ms instant incident overview (never blocks engine or UI)
+            copilot_response = self.copilot.generate_instant_overview(top_incident, latest_telem, matches)
+
+            # Solution 1: Asynchronous background Ollama LLM synthesis
+            target_inc_id = top_incident.id
+            if target_inc_id not in self._in_flight_incidents:
+                self._in_flight_incidents.add(target_inc_id)
+
+                def _async_enrich_worker(async_inc, async_telem, async_matches, inc_id):
+                    try:
+                        deep_resp = self.copilot.query_ollama(async_inc, async_telem, async_matches, timeout_seconds=60.0)
+                        if deep_resp:
+                            self.incident_db.update_copilot_guidance(inc_id, deep_resp)
+                            if self.last_snapshot and self.last_snapshot.incidents and self.last_snapshot.incidents[0].id == inc_id:
+                                self.last_snapshot.copilot_response = deep_resp
+                    except Exception:
+                        pass
+                    finally:
+                        self._in_flight_incidents.discard(inc_id)
+
+                self._llm_executor.submit(_async_enrich_worker, top_incident, latest_telem, matches, target_inc_id)
 
             # 6. Persist Incidents into IncidentDB with complete forensic packet envelope
             packet_samples = []

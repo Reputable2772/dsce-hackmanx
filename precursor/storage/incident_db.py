@@ -193,6 +193,9 @@ class IncidentDB:
             diag_cmds = getattr(copilot_response, "diagnostic_commands", [])
             verif_steps = getattr(copilot_response, "verification_steps", [])
             risks = getattr(copilot_response, "risks_and_rollback", [])
+            model_used = getattr(copilot_response, "model_used", "offline_fallback")
+        else:
+            model_used = "offline_fallback"
 
         # Build complete JSON envelope
         envelope = {
@@ -220,6 +223,7 @@ class IncidentDB:
                 "diagnostic_commands": diag_cmds,
                 "verification_steps": verif_steps,
                 "risks_and_rollback": risks,
+                "model_used": model_used,
             },
         }
 
@@ -437,6 +441,80 @@ class IncidentDB:
             cur.execute(
                 "UPDATE incidents SET status = ?, raw_envelope = ? WHERE id = ?",
                 (new_status, updated_env, incident_id),
+            )
+            conn.commit()
+            return cur.rowcount > 0
+
+    def update_copilot_guidance(self, incident_id: str, copilot_response: Any) -> bool:
+        """Update incident with enriched LLM suggestions and auditing after async inference."""
+        with self._get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT raw_envelope FROM incidents WHERE id = ?", (incident_id,))
+            row = cur.fetchone()
+            if not row:
+                return False
+            try:
+                env = json.loads(row["raw_envelope"])
+            except Exception:
+                return False
+
+            summary = getattr(copilot_response, "summary", "")
+            if hasattr(copilot_response, "structured_hypotheses") and copilot_response.structured_hypotheses:
+                hypotheses = [
+                    h.model_dump() if hasattr(h, "model_dump") else h
+                    for h in copilot_response.structured_hypotheses
+                ]
+            else:
+                hypotheses = [{"statement": h} for h in getattr(copilot_response, "hypotheses", [])]
+
+            assumptions = [
+                a.model_dump() if hasattr(a, "model_dump") else a
+                for a in getattr(copilot_response, "assumptions", [])
+            ]
+            claims = [
+                c.model_dump() if hasattr(c, "model_dump") else c
+                for c in getattr(copilot_response, "claims", [])
+            ]
+            diag_cmds = getattr(copilot_response, "diagnostic_commands", [])
+            verif_steps = getattr(copilot_response, "verification_steps", [])
+            risks = getattr(copilot_response, "risks_and_rollback", [])
+            model_used = getattr(copilot_response, "model_used", "offline_llm")
+
+            env["copilot"] = {
+                "summary": summary,
+                "hypotheses": hypotheses,
+                "assumptions": assumptions,
+                "claims": claims,
+                "diagnostic_commands": diag_cmds,
+                "verification_steps": verif_steps,
+                "risks_and_rollback": risks,
+                "model_used": model_used,
+            }
+
+            cur.execute(
+                """
+                UPDATE incidents SET
+                    copilot_summary = ?,
+                    copilot_hypotheses = ?,
+                    copilot_assumptions = ?,
+                    copilot_claims = ?,
+                    diagnostic_commands = ?,
+                    verification_steps = ?,
+                    risks_and_rollback = ?,
+                    raw_envelope = ?
+                WHERE id = ?
+            """,
+                (
+                    summary,
+                    json.dumps(hypotheses),
+                    json.dumps(assumptions),
+                    json.dumps(claims),
+                    json.dumps(diag_cmds),
+                    json.dumps(verif_steps),
+                    json.dumps(risks),
+                    json.dumps(env),
+                    incident_id,
+                ),
             )
             conn.commit()
             return cur.rowcount > 0

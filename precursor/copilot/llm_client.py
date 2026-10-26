@@ -103,20 +103,86 @@ class OllamaCopilot:
             pass
         return None
 
-    def explain_and_recommend(
+    def generate_instant_overview(
         self,
         incident: Incident,
         telemetry_snapshot: Dict[str, Optional[float]],
         runbook_matches: List[RunbookMatch],
     ) -> CopilotResponse:
         """
-        Generate grounded troubleshooting guidance enforcing strict JSON schema and dual auditing.
+        Instant (<5ms) deterministic incident overview and grounded guidance.
+        Produces complete structured JSON, verified numerical claims, and audited assumptions.
+        """
+        raw_text = self._generate_heuristic_fallback(incident, telemetry_snapshot, runbook_matches)
+        try:
+            parsed_strict = CopilotStrictJSON(**json.loads(raw_text))
+        except Exception:
+            parsed_strict = CopilotStrictJSON(
+                summary=f"Incident detected on {incident.title}.",
+                hypotheses=[
+                    CopilotHypothesisItem(
+                        id="H1",
+                        statement="Upstream route congestion or link degradation (Hypothesis)",
+                        confidence=0.85,
+                        rationale="Telemetry deviation observed",
+                    )
+                ],
+                assumptions=[],
+                numerical_claims=[],
+                diagnostic_commands=["ip -s link show dev eth0", "ping -c 5 1.1.1.1"],
+                verification_steps=["Confirm packet loss drops below 1.0%"],
+                risks_and_rollback=["Interface restart may drop in-flight streams"],
+            )
+
+        raw_claims_dict = [c.model_dump() for c in parsed_strict.numerical_claims]
+        claims = self.verifier.verify_structured_claims(raw_claims_dict, telemetry_snapshot)
+
+        regex_claims = self.verifier.verify_response(raw_text, telemetry_snapshot)
+        seen_keys = {(c.metric_id, c.claimed_value) for c in claims}
+        for rc in regex_claims:
+            if (rc.metric_id, rc.claimed_value) not in seen_keys:
+                claims.append(rc)
+                seen_keys.add((rc.metric_id, rc.claimed_value))
+
+        assumptions_dict = [a.model_dump() for a in parsed_strict.assumptions]
+        assumptions_audited = self.verifier.verify_assumptions(assumptions_dict, telemetry_snapshot)
+
+        hypotheses_strings = [
+            f"{h.statement} (confidence: {int(h.confidence * 100)}%)" if h.confidence else h.statement
+            for h in parsed_strict.hypotheses
+        ]
+
+        return CopilotResponse(
+            summary=parsed_strict.summary,
+            hypotheses=hypotheses_strings,
+            structured_hypotheses=parsed_strict.hypotheses,
+            assumptions=assumptions_audited,
+            diagnostic_commands=parsed_strict.diagnostic_commands,
+            verification_steps=parsed_strict.verification_steps,
+            risks_and_rollback=parsed_strict.risks_and_rollback,
+            claims=claims,
+            raw_llm_output=raw_text,
+            model_used="instant_heuristic_runbook",
+        )
+
+    def query_ollama(
+        self,
+        incident: Incident,
+        telemetry_snapshot: Dict[str, Optional[float]],
+        runbook_matches: List[RunbookMatch],
+        timeout_seconds: Optional[float] = None,
+    ) -> Optional[CopilotResponse]:
+        """
+        Query local Ollama asynchronously for deep LLM synthesis.
+        Returns CopilotResponse if successful, or None on error/timeout.
         """
         model = self._get_available_model()
+        if not model:
+            return None
 
-        # Build context prompt
         matched_rb_text = "\n\n".join([m.content for m in runbook_matches]) if runbook_matches else "No matching runbook."
         telemetry_str = ", ".join([f"{k}: {v}" for k, v in telemetry_snapshot.items() if v is not None])
+        t_limit = timeout_seconds or 60.0
 
         prompt = f"""You are PRECURSOR Network Copilot. A network incident has occurred.
 Analyze the incident using ONLY the provided telemetry and runbook context.
@@ -132,7 +198,7 @@ Runbook Context:
 {matched_rb_text}
 
 MANDATORY INSTRUCTIONS:
-1. You MUST respond with a single, strictly valid JSON object. Do not include markdown code block syntax outside the JSON.
+1. Respond with a single strictly valid JSON object. Do not include markdown code block syntax.
 2. Ground your answer strictly in the telemetry numbers.
 3. Formulate your assumptions in the 'assumptions' array with quantitative metric conditions where possible.
 4. Output schema format:
@@ -152,105 +218,65 @@ MANDATORY INSTRUCTIONS:
   "risks_and_rollback": ["Restarting interface interrupts in-flight connections"]
 }}
 """
+        try:
+            payload = {
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+                "format": "json",
+                "options": {"temperature": 0.2, "top_p": 0.9, "num_predict": 300},
+            }
+            resp = requests.post(f"{self.base_url}/api/generate", json=payload, timeout=t_limit)
+            if resp.status_code != 200:
+                return None
+            raw_text = resp.json().get("response", "")
+            parsed_dict = json.loads(raw_text)
+            parsed_strict = CopilotStrictJSON(**parsed_dict)
 
-        raw_text = None
-        used_model = "offline_heuristic_fallback"
-        parsed_strict: Optional[CopilotStrictJSON] = None
+            raw_claims_dict = [c.model_dump() for c in parsed_strict.numerical_claims]
+            claims = self.verifier.verify_structured_claims(raw_claims_dict, telemetry_snapshot)
 
-        if model:
-            try:
-                payload = {
-                    "model": model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "format": "json",
-                    "options": {"temperature": 0.2, "top_p": 0.9},
-                }
-                resp = requests.post(
-                    f"{self.base_url}/api/generate",
-                    json=payload,
-                    timeout=self.timeout_seconds,
-                )
-                if resp.status_code == 200:
-                    raw_text = resp.json().get("response", "")
-                    used_model = model
-                    try:
-                        parsed_dict = json.loads(raw_text)
-                        parsed_strict = CopilotStrictJSON(**parsed_dict)
-                    except Exception:
-                        parsed_strict = None
-            except Exception:
-                raw_text = None
+            regex_claims = self.verifier.verify_response(raw_text, telemetry_snapshot)
+            seen_keys = {(c.metric_id, c.claimed_value) for c in claims}
+            for rc in regex_claims:
+                if (rc.metric_id, rc.claimed_value) not in seen_keys:
+                    claims.append(rc)
+                    seen_keys.add((rc.metric_id, rc.claimed_value))
 
-        if not parsed_strict:
-            # Deterministic heuristic fallback producing strict JSON
-            raw_text = self._generate_heuristic_fallback(incident, telemetry_snapshot, runbook_matches)
-            used_model = "offline_heuristic_fallback"
-            try:
-                parsed_strict = CopilotStrictJSON(**json.loads(raw_text))
-            except Exception:
-                # Fallback to minimal valid schema if JSON decoding fails
-                parsed_strict = CopilotStrictJSON(
-                    summary=f"Incident detected on {incident.title}. Telemetry: {telemetry_str}",
-                    hypotheses=[
-                        CopilotHypothesisItem(
-                            id="H1",
-                            statement="Upstream route congestion or transceiver degradation (Hypothesis)",
-                            confidence=0.85,
-                            rationale="Observed telemetry deviation against nominal baseline",
-                        )
-                    ],
-                    assumptions=[
-                        CopilotAssumptionItem(
-                            id="A1",
-                            statement="Interface link remains carrier up",
-                            metric_id="link_state",
-                            operator="==",
-                            expected_value=1.0,
-                        )
-                    ],
-                    numerical_claims=[],
-                    diagnostic_commands=["ip -s link show dev eth0", "ping -c 5 1.1.1.1"],
-                    verification_steps=["Verify telemetry returns within operational SLA"],
-                    risks_and_rollback=["Interface restarts may disrupt TCP sessions"],
-                )
+            assumptions_dict = [a.model_dump() for a in parsed_strict.assumptions]
+            assumptions_audited = self.verifier.verify_assumptions(assumptions_dict, telemetry_snapshot)
 
-        # 1. Verify structured numerical claims from JSON
-        raw_claims_dict = [c.model_dump() for c in parsed_strict.numerical_claims]
-        claims = self.verifier.verify_structured_claims(raw_claims_dict, telemetry_snapshot)
+            hypotheses_strings = [
+                f"{h.statement} (confidence: {int(h.confidence * 100)}%)" if h.confidence else h.statement
+                for h in parsed_strict.hypotheses
+            ]
 
-        # 2. Also run regex extraction over text/summary to catch any natural language numbers
-        regex_claims = self.verifier.verify_response(raw_text, telemetry_snapshot)
-        seen_keys = {(c.metric_id, c.claimed_value) for c in claims}
-        for rc in regex_claims:
-            if (rc.metric_id, rc.claimed_value) not in seen_keys:
-                claims.append(rc)
-                seen_keys.add((rc.metric_id, rc.claimed_value))
+            return CopilotResponse(
+                summary=parsed_strict.summary,
+                hypotheses=hypotheses_strings,
+                structured_hypotheses=parsed_strict.hypotheses,
+                assumptions=assumptions_audited,
+                diagnostic_commands=parsed_strict.diagnostic_commands,
+                verification_steps=parsed_strict.verification_steps,
+                risks_and_rollback=parsed_strict.risks_and_rollback,
+                claims=claims,
+                raw_llm_output=raw_text,
+                model_used=model,
+            )
+        except Exception:
+            return None
 
-        # 3. Audit operational assumptions against telemetry snapshot
-        assumptions_dict = [a.model_dump() for a in parsed_strict.assumptions]
-        assumptions_audited = self.verifier.verify_assumptions(assumptions_dict, telemetry_snapshot)
-
-        # Format hypotheses strings for backwards compatibility
-        hypotheses_strings = [
-            f"{h.statement} (confidence: {int(h.confidence * 100)}%)" if h.confidence else h.statement
-            for h in parsed_strict.hypotheses
-        ]
-        if not hypotheses_strings:
-            hypotheses_strings = ["Potential route flap or link degradation (Hypothesis)"]
-
-        return CopilotResponse(
-            summary=parsed_strict.summary,
-            hypotheses=hypotheses_strings,
-            structured_hypotheses=parsed_strict.hypotheses,
-            assumptions=assumptions_audited,
-            diagnostic_commands=parsed_strict.diagnostic_commands,
-            verification_steps=parsed_strict.verification_steps,
-            risks_and_rollback=parsed_strict.risks_and_rollback,
-            claims=claims,
-            raw_llm_output=raw_text,
-            model_used=used_model,
-        )
+    def explain_and_recommend(
+        self,
+        incident: Incident,
+        telemetry_snapshot: Dict[str, Optional[float]],
+        runbook_matches: List[RunbookMatch],
+    ) -> CopilotResponse:
+        """
+        Generate grounded troubleshooting guidance enforcing strict JSON schema and dual auditing.
+        Synchronous path returns sub-5ms instant heuristic overview.
+        """
+        return self.generate_instant_overview(incident, telemetry_snapshot, runbook_matches)
 
     def _generate_heuristic_fallback(
         self,
