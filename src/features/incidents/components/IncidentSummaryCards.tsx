@@ -1,97 +1,112 @@
 import React from 'react';
-import { AlertCircle, Clock, CheckCircle2, ShieldCheck } from 'lucide-react';
-import { IncidentRecord, IncidentStatus } from '../types';
+import { AlertCircle, AlertTriangle, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { IncidentRecord, IncidentStatus, IncidentSeverity } from '../types';
 
 interface IncidentSummaryCardsProps {
   incidents: IncidentRecord[];
   selectedStatus: IncidentStatus | 'ALL';
   onSelectStatus: (status: IncidentStatus | 'ALL') => void;
+  selectedSeverity?: IncidentSeverity | 'ALL';
+  onSelectSeverity?: (sev: IncidentSeverity | 'ALL') => void;
 }
 
 export const IncidentSummaryCards: React.FC<IncidentSummaryCardsProps> = ({
   incidents,
   selectedStatus,
-  onSelectStatus
+  onSelectStatus,
+  selectedSeverity,
+  onSelectSeverity,
 }) => {
-  const counts = {
-    ALL: incidents.length,
-    OPEN: incidents.filter(i => i.status === 'OPEN').length,
-    INVESTIGATING: incidents.filter(i => i.status === 'INVESTIGATING').length,
-    ACKNOWLEDGED: incidents.filter(i => i.status === 'ACKNOWLEDGED').length,
-    RESOLVED: incidents.filter(i => i.status === 'RESOLVED').length,
-  };
+  const safeIncidents = Array.isArray(incidents) ? incidents : [];
 
-  const cards: Array<{
-    status: IncidentStatus | 'ALL';
-    label: string;
-    count: number;
-    icon: typeof AlertCircle;
-    color: string;
-    bg: string;
-    border: string;
-  }> = [
+  // Strict calculations directly from real records
+  const totalCount = safeIncidents.length;
+  const activeCount = safeIncidents.filter((i) => i.status !== 'RESOLVED').length;
+  const warningCount = safeIncidents.filter((i) => i.severity === 'WARNING').length;
+  const resolvedCount = safeIncidents.filter((i) => i.status === 'RESOLVED').length;
+
+  const cards = [
     {
-      status: 'INVESTIGATING',
-      label: 'Investigating',
-      count: counts.INVESTIGATING,
-      icon: Clock,
-      color: 'text-amber-400',
-      bg: 'bg-amber-500/10',
-      border: 'border-amber-500/30'
+      id: 'active',
+      label: 'Active Incidents',
+      count: totalCount > 0 ? activeCount : 0,
+      icon: ShieldAlert,
+      color: 'text-rose-600',
+      bg: 'bg-rose-50',
+      border: 'border-rose-200',
+      isActive: selectedStatus === 'OPEN' || selectedStatus === 'INVESTIGATING',
+      onClick: () => {
+        onSelectStatus(selectedStatus === 'OPEN' ? 'ALL' : 'OPEN');
+      },
     },
     {
-      status: 'OPEN',
-      label: 'Open / Unassigned',
-      count: counts.OPEN,
-      icon: AlertCircle,
-      color: 'text-rose-400',
-      bg: 'bg-rose-500/10',
-      border: 'border-rose-500/30'
+      id: 'warnings',
+      label: 'Warnings',
+      count: totalCount > 0 ? warningCount : 0,
+      icon: AlertTriangle,
+      color: 'text-amber-600',
+      bg: 'bg-amber-50',
+      border: 'border-amber-200',
+      isActive: selectedSeverity === 'WARNING',
+      onClick: () => {
+        if (onSelectSeverity) {
+          onSelectSeverity(selectedSeverity === 'WARNING' ? 'ALL' : 'WARNING');
+        }
+      },
     },
     {
-      status: 'ACKNOWLEDGED',
-      label: 'Acknowledged',
-      count: counts.ACKNOWLEDGED,
-      icon: ShieldCheck,
-      color: 'text-purple-400',
-      bg: 'bg-purple-500/10',
-      border: 'border-purple-500/30'
-    },
-    {
-      status: 'RESOLVED',
-      label: 'Resolved',
-      count: counts.RESOLVED,
+      id: 'resolved',
+      label: 'Resolved Incidents',
+      count: totalCount > 0 ? resolvedCount : 0,
       icon: CheckCircle2,
-      color: 'text-emerald-400',
-      bg: 'bg-emerald-500/10',
-      border: 'border-emerald-500/30'
-    }
+      color: 'text-emerald-600',
+      bg: 'bg-emerald-50',
+      border: 'border-emerald-200',
+      isActive: selectedStatus === 'RESOLVED',
+      onClick: () => {
+        onSelectStatus(selectedStatus === 'RESOLVED' ? 'ALL' : 'RESOLVED');
+      },
+    },
+    {
+      id: 'total',
+      label: 'Total Incidents',
+      count: totalCount > 0 ? totalCount : 0,
+      icon: AlertCircle,
+      color: 'text-[#5267D8]',
+      bg: 'bg-[#EEF2FF]',
+      border: 'border-indigo-200',
+      isActive: selectedStatus === 'ALL' && (!selectedSeverity || selectedSeverity === 'ALL'),
+      onClick: () => {
+        onSelectStatus('ALL');
+        if (onSelectSeverity) onSelectSeverity('ALL');
+      },
+    },
   ];
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {cards.map((c) => {
-        const isSelected = selectedStatus === c.status;
         const Icon = c.icon;
         return (
           <button
-            key={c.status}
-            onClick={() => onSelectStatus(isSelected ? 'ALL' : c.status)}
-            className={`flex items-center justify-between rounded-xl border p-3 text-left backdrop-blur-xl transition-all duration-200 shadow-glass-panel ${
-              isSelected
-                ? `${c.border} ${c.bg} ring-1 ring-precursor-cyan/50 shadow-glow-cyan/20`
-                : 'border-white/[0.08] bg-precursor-card-glass hover:border-precursor-purple/40 hover:bg-precursor-surface/60'
+            key={c.id}
+            type="button"
+            onClick={c.onClick}
+            className={`flex items-center justify-between rounded-xl border p-3.5 text-left transition-all duration-150 ${
+              c.isActive
+                ? `${c.border} ${c.bg} ring-2 ring-[#5267D8]/30 shadow-xs`
+                : 'border-[#E3E8F0] bg-white hover:bg-[#F8FAFC] hover:border-[#CBD5E1] shadow-xs'
             }`}
           >
             <div>
-              <span className="text-xs font-semibold text-slate-300">
+              <span className="text-xs font-semibold text-[#687386]">
                 {c.label}
               </span>
-              <div className={`mt-0.5 font-mono text-2xl font-extrabold ${c.color}`}>
+              <div className={`mt-1 font-mono text-2xl font-extrabold ${c.color}`}>
                 {c.count}
               </div>
             </div>
-            <div className={`rounded-xl p-2 ${c.bg} border ${c.border}`}>
+            <div className={`rounded-lg p-2.5 ${c.bg} border ${c.border}`}>
               <Icon className={`h-4 w-4 ${c.color}`} />
             </div>
           </button>

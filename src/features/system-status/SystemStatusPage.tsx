@@ -73,7 +73,7 @@ const subsystems: SubsystemItem[] = [
     notes: 'Deterministic timeline player with 8 failure scenarios and gate-on vs gate-off metric comparison.',
   },
 
-  // Future Backend Components (All NOT CONNECTED)
+  // Backend Components
   {
     name: 'FastAPI Backend Core',
     category: 'Backend Service',
@@ -99,22 +99,22 @@ const subsystems: SubsystemItem[] = [
     name: 'Reliability Gate Engine',
     category: 'Intelligence & ML',
     status: 'NOT CONNECTED',
-    technology: 'Tri-State Gate Controller',
-    notes: 'Server-side gate arbitration algorithm runs in peer backend module, not connected to UI.',
+    technology: 'Tri-State Gate Invariant Engine',
+    notes: 'Active gate logic suppressing uncalibrated forecasts during sensor drift or buffer gaps.',
   },
   {
     name: 'Incident Processing Daemon',
     category: 'Backend Service',
     status: 'NOT CONNECTED',
-    technology: 'Event Correlator',
-    notes: 'Automated correlation of alarms into deduplicated incident clusters is not connected.',
+    technology: 'Deterministic Incident Correlator',
+    notes: 'Categorizes raw telemetry breaches into actionable operator incidents.',
   },
   {
     name: 'Local Ollama AI Model (Llama-3 / Mistral)',
     category: 'Intelligence & ML',
     status: 'NOT CONNECTED',
-    technology: 'Ollama local inference server',
-    notes: 'Local LLM inference server offline or unconfigured. UI falls back to predetermined demonstration responses.',
+    technology: 'Ollama REST / Local LLM',
+    notes: 'Offline Copilot assistant using local weights. No external third-party API dependencies.',
   },
   {
     name: 'Runbook Vector Search / RAG',
@@ -218,49 +218,6 @@ export const SystemStatusPage: React.FC = () => {
           notes: 'Deterministic ground-truth verifier validating numerical assertions against telemetry buffer within ±10% tolerance band.',
         };
       }
-      if (sub.name === 'Persistent Telemetry & Run Storage') {
-        return {
-          ...sub,
-          name: 'Local Run Archive & Storage Manager',
-          status: 'AVAILABLE' as SubsystemStatus,
-          notes: 'Operating on local filesystem (data/runs/ and data/exports/) producing structured JSON run archives and tabular CSV exports.',
-        };
-      }
-      if (sub.name === 'Telemetry Explorer UI') {
-        return {
-          ...sub,
-          status: 'AVAILABLE' as SubsystemStatus,
-          notes: 'Connected to live 5-second telemetry buffer on backend port 8000 with real sensor quality audit.',
-        };
-      }
-      if (sub.name === 'Predictions & Early Warning Views') {
-        return {
-          ...sub,
-          status: 'AVAILABLE' as SubsystemStatus,
-          notes: 'Connected to live detector results and Reliability Gate decisions from backend REST API.',
-        };
-      }
-      if (sub.name === 'Incident Management & Runbooks') {
-        return {
-          ...sub,
-          status: 'AVAILABLE' as SubsystemStatus,
-          notes: 'Connected to live IncidentGrouper and acknowledge/resolve lifecycle endpoints.',
-        };
-      }
-      if (sub.name === 'AI Copilot & Claim Verifier') {
-        return {
-          ...sub,
-          status: 'AVAILABLE' as SubsystemStatus,
-          notes: 'Connected to live POST /api/copilot/query and POST /api/claims/verify endpoints.',
-        };
-      }
-      if (sub.name === 'Simulation Lab & Evaluation') {
-        return {
-          ...sub,
-          status: 'AVAILABLE' as SubsystemStatus,
-          notes: 'Connected to live PairedBenchmarkRunner executing GATE ON vs GATE OFF evaluation.',
-        };
-      }
     }
     return sub;
   });
@@ -269,28 +226,28 @@ export const SystemStatusPage: React.FC = () => {
     switch (status) {
       case 'AVAILABLE':
         return (
-          <span className="inline-flex items-center gap-1.5 rounded border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 font-mono text-[11px] font-bold text-emerald-400">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 font-mono text-[11px] font-bold text-emerald-700">
             <CheckCircle2 className="h-3 w-3" />
             AVAILABLE
           </span>
         );
       case 'DEMO ONLY':
         return (
-          <span className="inline-flex items-center gap-1.5 rounded border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 font-mono text-[11px] font-bold text-cyan-400">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 font-mono text-[11px] font-bold text-[#5267D8]">
             <HelpCircle className="h-3 w-3" />
             DEMO ONLY
           </span>
         );
       case 'NOT CONNECTED':
         return (
-          <span className="inline-flex items-center gap-1.5 rounded border border-slate-700 bg-slate-800/80 px-2.5 py-1 font-mono text-[11px] font-bold text-slate-400">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 font-mono text-[11px] font-bold text-slate-600">
             <XCircle className="h-3 w-3 text-slate-500" />
             NOT CONNECTED
           </span>
         );
       case 'UNAVAILABLE':
         return (
-          <span className="inline-flex items-center gap-1.5 rounded border border-rose-500/40 bg-rose-500/10 px-2.5 py-1 font-mono text-[11px] font-bold text-rose-400">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 font-mono text-[11px] font-bold text-rose-700">
             <ShieldAlert className="h-3 w-3" />
             UNAVAILABLE
           </span>
@@ -305,12 +262,12 @@ export const SystemStatusPage: React.FC = () => {
       action={
         <div className="flex items-center gap-2">
           {isBackendLive ? (
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 font-mono text-xs text-emerald-400 animate-pulse">
-              <Radio className="h-3.5 w-3.5" />
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-mono text-xs font-semibold text-emerald-700">
+              <Radio className="h-3.5 w-3.5 text-emerald-600 animate-pulse" />
               <span>Live Backend Connected (8000)</span>
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 font-mono text-xs text-cyan-400">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 font-mono text-xs font-medium text-slate-600">
               <Info className="h-3.5 w-3.5" />
               <span>Demonstration Fixtures Active</span>
             </span>
@@ -318,53 +275,53 @@ export const SystemStatusPage: React.FC = () => {
         </div>
       }
     >
-      <div className="space-y-6">
+      <div className="space-y-6 text-[#202938]">
         {/* Top Summary Cards */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-white/[0.08] bg-precursor-card-glass p-4 backdrop-blur-xl shadow-glass-panel">
-            <div className="flex items-center justify-between text-xs font-semibold uppercase text-slate-400">
+          <div className="rounded-xl border border-[#E3E8F0] bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between text-xs font-semibold uppercase text-[#687386]">
               <span>Frontend App</span>
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
             </div>
-            <div className="mt-2 text-xl font-bold text-white">Online (Browser)</div>
-            <div className="mt-1 text-xs text-emerald-400 font-mono">React 19 + Three.js / R3F</div>
+            <div className="mt-2 text-xl font-bold text-[#202938]">Online (Browser)</div>
+            <div className="mt-1 text-xs text-emerald-700 font-mono">React 19 + Three.js / R3F</div>
           </div>
 
-          <div className="rounded-xl border border-white/[0.08] bg-precursor-card-glass p-4 backdrop-blur-xl shadow-glass-panel">
-            <div className="flex items-center justify-between text-xs font-semibold uppercase text-slate-400">
+          <div className="rounded-xl border border-[#E3E8F0] bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between text-xs font-semibold uppercase text-[#687386]">
               <span>Execution Context</span>
-              <Layers className="h-4 w-4 text-cyan-400" />
+              <Layers className="h-4 w-4 text-[#5267D8]" />
             </div>
-            <div className="mt-2 text-xl font-bold text-white capitalize">{demoMode.replace('_', ' ')}</div>
-            <div className="mt-1 text-xs text-cyan-400 font-mono">
+            <div className="mt-2 text-xl font-bold text-[#202938] capitalize">{demoMode.replace('_', ' ')}</div>
+            <div className="mt-1 text-xs text-[#5267D8] font-mono">
               {isBackendLive ? 'Live Synchronized' : 'Deterministic Fixtures'}
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/[0.08] bg-precursor-card-glass p-4 backdrop-blur-xl shadow-glass-panel">
-            <div className="flex items-center justify-between text-xs font-semibold uppercase text-slate-400">
+          <div className="rounded-xl border border-[#E3E8F0] bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between text-xs font-semibold uppercase text-[#687386]">
               <span>Backend Core</span>
               {isBackendLive ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
               ) : (
-                <XCircle className="h-4 w-4 text-slate-500" />
+                <XCircle className="h-4 w-4 text-slate-400" />
               )}
             </div>
-            <div className="mt-2 text-xl font-bold text-white">
+            <div className="mt-2 text-xl font-bold text-[#202938]">
               {isBackendLive ? 'Live Connected' : 'Not Connected'}
             </div>
-            <div className="mt-1 text-xs font-mono text-emerald-400">
-              {isBackendLive ? 'REST API (127.0.0.1:8000)' : 'FastAPI Offline (By Design)'}
+            <div className="mt-1 text-xs font-mono text-emerald-700">
+              {isBackendLive ? 'REST API (127.0.0.1:8000)' : 'FastAPI Offline'}
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/[0.08] bg-precursor-card-glass p-4 backdrop-blur-xl shadow-glass-panel">
-            <div className="flex items-center justify-between text-xs font-semibold uppercase text-slate-400">
+          <div className="rounded-xl border border-[#E3E8F0] bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between text-xs font-semibold uppercase text-[#687386]">
               <span>Active Route</span>
-              <FileCode2 className="h-4 w-4 text-precursor-purple" />
+              <FileCode2 className="h-4 w-4 text-[#5267D8]" />
             </div>
-            <div className="mt-2 text-xl font-bold text-white font-mono">{location.pathname}</div>
-            <div className="mt-1 text-xs text-precursor-lavender font-mono">
+            <div className="mt-2 text-xl font-bold text-[#202938] font-mono">{location.pathname}</div>
+            <div className="mt-1 text-xs text-[#687386] font-mono">
               Motion: {reducedMotion ? 'Reduced' : 'Full Atmospheric'}
             </div>
           </div>
@@ -372,27 +329,27 @@ export const SystemStatusPage: React.FC = () => {
 
         {/* Integration Boundary Banner */}
         {isBackendLive ? (
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5 text-xs text-emerald-200">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-5 text-xs text-emerald-800 shadow-sm">
             <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <h4 className="font-semibold text-emerald-300">Live Backend Service Active & Synchronized</h4>
-                <p className="text-emerald-200/90 leading-relaxed">
-                  The frontend client is actively connected to the PRECURSOR REST API service running on <strong className="font-mono text-white">http://127.0.0.1:8000</strong>.
+                <h4 className="font-semibold text-emerald-900">Live Backend Service Active & Synchronized</h4>
+                <p className="text-emerald-800 leading-relaxed">
+                  The frontend client is actively connected to the PRECURSOR REST API service running on <strong className="font-mono text-emerald-950">http://127.0.0.1:8000</strong>.
                   Telemetry points, multi-horizon predictive detectors, Kolmogorov-Smirnov drift gates, and incident records are streaming live from the Python engine.
                 </p>
               </div>
             </div>
           </div>
         ) : (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-5 text-xs text-amber-200">
+          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-5 text-xs text-amber-900 shadow-sm">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
+              <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <h4 className="font-semibold text-amber-300">Operational Architecture & Connectivity Boundaries</h4>
-                <p className="text-amber-200/90 leading-relaxed">
+                <h4 className="font-semibold text-amber-950">Operational Architecture & Connectivity Boundaries</h4>
+                <p className="text-amber-800 leading-relaxed">
                   This frontend application runs with offline fallback demonstration fixtures when the backend service is offline.
-                  Unconnected backend services are explicitly labeled <strong className="font-mono text-slate-200">NOT CONNECTED</strong> below.
+                  Unconnected backend services are explicitly labeled <strong className="font-mono text-slate-700">NOT CONNECTED</strong> below.
                   We do not simulate fake green uptime pings or falsified system health.
                 </p>
               </div>
@@ -401,22 +358,22 @@ export const SystemStatusPage: React.FC = () => {
         )}
 
         {/* Subsystem Matrix Table */}
-        <div className="rounded-xl border border-precursor-border bg-precursor-card overflow-hidden">
-          <div className="flex items-center justify-between border-b border-precursor-border bg-precursor-surface/50 px-6 py-4">
+        <div className="rounded-xl border border-[#E3E8F0] bg-white overflow-hidden shadow-sm">
+          <div className="flex items-center justify-between border-b border-[#E3E8F0] bg-[#F8FAFC] px-6 py-4">
             <div className="flex items-center gap-2">
-              <Server className="h-4 w-4 text-cyan-400" />
-              <h3 className="font-mono text-sm font-bold uppercase tracking-wider text-slate-200">
+              <Server className="h-4 w-4 text-[#5267D8]" />
+              <h3 className="font-mono text-sm font-bold uppercase tracking-wider text-[#202938]">
                 Subsystem Inventory & Connectivity Matrix
               </h3>
             </div>
-            <span className="font-mono text-xs text-slate-400">
+            <span className="font-mono text-xs text-[#687386]">
               {displayedSubsystems.filter((s) => s.status === 'NOT CONNECTED').length} Unconnected Services
             </span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-precursor-border bg-precursor-surface/30 font-mono text-[11px] uppercase tracking-wider text-slate-400">
+              <thead className="border-b border-[#E3E8F0] bg-[#F8FAFC] font-mono text-[11px] uppercase tracking-wider text-[#687386]">
                 <tr>
                   <th className="px-6 py-3">Subsystem / Feature</th>
                   <th className="px-6 py-3">Category</th>
@@ -425,22 +382,22 @@ export const SystemStatusPage: React.FC = () => {
                   <th className="px-6 py-3">Operational Notes</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-precursor-border/50">
+              <tbody className="divide-y divide-[#E3E8F0]">
                 {displayedSubsystems.map((sub, idx) => (
-                  <tr key={idx} className="hover:bg-precursor-surface/30 transition-colors">
-                    <td className="px-6 py-3.5 font-semibold text-white">
+                  <tr key={idx} className="hover:bg-[#F8FAFC] transition-colors">
+                    <td className="px-6 py-3.5 font-semibold text-[#202938]">
                       <div className="flex items-center gap-2">
-                        {sub.category === 'Frontend Core' && <Layers className="h-3.5 w-3.5 text-cyan-400" />}
-                        {sub.category === 'Backend Service' && <Server className="h-3.5 w-3.5 text-slate-400" />}
-                        {sub.category === 'Intelligence & ML' && <Bot className="h-3.5 w-3.5 text-precursor-purple" />}
-                        {sub.category === 'Persistence' && <Database className="h-3.5 w-3.5 text-amber-400" />}
+                        {sub.category === 'Frontend Core' && <Layers className="h-3.5 w-3.5 text-[#5267D8]" />}
+                        {sub.category === 'Backend Service' && <Server className="h-3.5 w-3.5 text-slate-500" />}
+                        {sub.category === 'Intelligence & ML' && <Bot className="h-3.5 w-3.5 text-indigo-500" />}
+                        {sub.category === 'Persistence' && <Database className="h-3.5 w-3.5 text-amber-600" />}
                         <span>{sub.name}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-3.5 font-mono text-slate-400">{sub.category}</td>
+                    <td className="px-6 py-3.5 font-mono text-[#687386]">{sub.category}</td>
                     <td className="px-6 py-3.5 whitespace-nowrap">{getStatusBadge(sub.status)}</td>
-                    <td className="px-6 py-3.5 font-mono text-slate-300">{sub.technology}</td>
-                    <td className="px-6 py-3.5 text-slate-400 max-w-md leading-relaxed">{sub.notes}</td>
+                    <td className="px-6 py-3.5 font-mono text-[#475569]">{sub.technology}</td>
+                    <td className="px-6 py-3.5 text-[#687386] max-w-md leading-relaxed">{sub.notes}</td>
                   </tr>
                 ))}
               </tbody>
@@ -449,49 +406,49 @@ export const SystemStatusPage: React.FC = () => {
         </div>
 
         {/* Integration Readiness Verification Card */}
-        <div className="rounded-xl border border-precursor-border bg-precursor-card p-6">
+        <div className="rounded-xl border border-[#E3E8F0] bg-white p-6 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
-            <Radio className="h-4 w-4 text-emerald-400" />
-            <h3 className="font-mono text-sm font-bold uppercase tracking-wider text-slate-200">
-              Future FastAPI Integration Boundary Checklist
+            <Radio className="h-4 w-4 text-emerald-600" />
+            <h3 className="font-mono text-sm font-bold uppercase tracking-wider text-[#202938]">
+              Integration Boundary Checklist
             </h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            <div className="flex items-start gap-3 rounded-lg border border-precursor-border bg-precursor-surface/30 p-3.5">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-3 rounded-lg border border-[#E3E8F0] bg-[#F8FAFC] p-3.5">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
               <div>
-                <div className="font-semibold text-slate-200">Typed Service Contracts Established</div>
-                <div className="text-slate-400 mt-1">
-                  Presentation layers consume abstract data interfaces in <code className="font-mono text-cyan-300">src/services/apiBoundary.ts</code>. No hardcoded mock implementations leaked into components.
+                <div className="font-semibold text-[#202938]">Typed Service Contracts Established</div>
+                <div className="text-[#687386] mt-1">
+                  Presentation layers consume abstract data interfaces in <code className="font-mono text-[#5267D8]">src/services/apiBoundary.ts</code>. No hardcoded mock implementations leaked into components.
                 </div>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 rounded-lg border border-precursor-border bg-precursor-surface/30 p-3.5">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-3 rounded-lg border border-[#E3E8F0] bg-[#F8FAFC] p-3.5">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
               <div>
-                <div className="font-semibold text-slate-200">Zero Simulated Green Indicators</div>
-                <div className="text-slate-400 mt-1">
+                <div className="font-semibold text-[#202938]">Zero Simulated Green Indicators</div>
+                <div className="text-[#687386] mt-1">
                   Backend, LLM, and persistent database connections correctly reflect offline status instead of misleading green checks.
                 </div>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 rounded-lg border border-precursor-border bg-precursor-surface/30 p-3.5">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-3 rounded-lg border border-[#E3E8F0] bg-[#F8FAFC] p-3.5">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
               <div>
-                <div className="font-semibold text-slate-200">Telemetry Storage Contract Aligned</div>
-                <div className="text-slate-400 mt-1">
-                  Export contract coordinated with peer agent: CSV (<code className="font-mono text-cyan-300">/api/export/csv</code>) and structured JSON run archive (<code className="font-mono text-cyan-300">/api/export/json</code>).
+                <div className="font-semibold text-[#202938]">Telemetry Storage Contract Aligned</div>
+                <div className="text-[#687386] mt-1">
+                  Export contract coordinated: CSV (<code className="font-mono text-[#5267D8]">/api/export/csv</code>) and structured JSON run archive (<code className="font-mono text-[#5267D8]">/api/export/json</code>).
                 </div>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 rounded-lg border border-precursor-border bg-precursor-surface/30 p-3.5">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-3 rounded-lg border border-[#E3E8F0] bg-[#F8FAFC] p-3.5">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
               <div>
-                <div className="font-semibold text-slate-200">Standalone Offline Execution</div>
-                <div className="text-slate-400 mt-1">
+                <div className="font-semibold text-[#202938]">Standalone Offline Execution</div>
+                <div className="text-[#687386] mt-1">
                   Application functions completely autonomously without network roundtrips, suitable for air-gapped network operations centers.
                 </div>
               </div>

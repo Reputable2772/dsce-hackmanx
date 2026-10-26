@@ -14,7 +14,7 @@ type ActiveTab = 'simulation' | 'evaluation' | 'gate-guide';
 
 export const SimulationLabPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('simulation');
-  const { config, phase, evaluation, setScenario } = useSimulationStore();
+  const { config, evaluation, setScenario } = useSimulationStore();
 
   const tabs: { id: ActiveTab; label: string; icon: React.ElementType }[] = [
     { id: 'simulation', label: 'Simulation Lab', icon: FlaskConical },
@@ -27,14 +27,14 @@ export const SimulationLabPage: React.FC = () => {
       title="Simulation Lab & Evaluation"
       subtitle="Interactive scenario explorer — compare reliability-gated vs ungated predictions on deterministic demonstration data."
       action={
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-precursor-purple/30 bg-precursor-purple/10 px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-wider text-precursor-purple">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-precursor-purple" />
-          Demo Simulation
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-[#EEF2FF] px-3 py-1 font-mono text-[11px] font-semibold text-[#5267D8]">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#5267D8]" />
+          Simulation Lab
         </span>
       }
     >
       {/* Tab Navigation */}
-      <div className="mb-6 flex gap-1 rounded-xl border border-white/[0.08] bg-precursor-card-glass p-1.5 backdrop-blur-xl shadow-glass-panel">
+      <div className="mb-6 flex gap-1 rounded-xl border border-[#E3E8F0] bg-white p-1.5 shadow-sm text-[#202938]">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -43,10 +43,10 @@ export const SimulationLabPage: React.FC = () => {
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-mono font-bold transition-all sm:flex-initial ${
+              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-mono font-bold transition-all sm:flex-initial ${
                 isActive
-                  ? 'border border-precursor-purple/40 bg-precursor-violet/60 text-white shadow-glow-purple/20'
-                  : 'text-slate-400 hover:bg-precursor-surface/60 hover:text-slate-200'
+                  ? 'bg-[#5267D8] text-white shadow-xs'
+                  : 'text-[#687386] hover:bg-[#F8FAFC] hover:text-[#202938]'
               }`}
             >
               <Icon className="h-3.5 w-3.5" />
@@ -59,12 +59,22 @@ export const SimulationLabPage: React.FC = () => {
       {/* Tab Content */}
       {activeTab === 'simulation' && (
         <div className="space-y-6">
-          {/* Scenario Library */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <TimelineViewer />
+            </div>
+            <div>
+              <SimulationConfigPanel />
+            </div>
+          </div>
+
+          {evaluation && <GateComparisonPanel comparison={evaluation} />}
+
           <div>
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-400">
-              Scenario Library
-            </h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <h3 className="mb-3 font-mono text-xs font-bold uppercase tracking-wider text-[#687386]">
+              Deterministic Failure Scenarios
+            </h3>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {scenarioDefinitions.map((scenario) => (
                 <ScenarioCard
                   key={scenario.id}
@@ -75,27 +85,13 @@ export const SimulationLabPage: React.FC = () => {
               ))}
             </div>
           </div>
-
-          {/* Configuration */}
-          <SimulationConfigPanel />
-
-          {/* Timeline (shown after run) */}
-          {phase === 'completed' && (
-            <>
-              <TimelineViewer />
-              {evaluation && <GateComparisonPanel comparison={evaluation} />}
-            </>
-          )}
         </div>
       )}
 
       {activeTab === 'evaluation' && (
         <EvaluationDashboard
           activeScenarioId={config.scenarioId}
-          onSelectScenario={(id) => {
-            setScenario(id);
-            setActiveTab('simulation');
-          }}
+          onSelectScenario={setScenario}
         />
       )}
 

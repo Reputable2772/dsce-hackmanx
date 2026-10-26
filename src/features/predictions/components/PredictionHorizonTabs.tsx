@@ -20,36 +20,36 @@ export const PredictionHorizonTabs: React.FC<PredictionHorizonTabsProps> = ({
   ];
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-precursor-card-glass p-2 backdrop-blur-xl shadow-glass-panel">
-      <div className="flex items-center gap-2 px-3">
-        <Clock className="h-4 w-4 text-precursor-purple" />
-        <span className="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-[#E3E8F0] bg-white p-3 shadow-sm text-[#202938]">
+      <div className="flex items-center gap-2 px-1">
+        <Clock className="h-4 w-4 text-[#5267D8]" />
+        <span className="text-xs font-bold text-[#687386] uppercase tracking-wider font-mono">
           Horizon Lookahead:
         </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 flex-1 max-w-2xl">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1 max-w-3xl">
         {horizons.map((h) => {
           const isSelected = selectedHorizon === h.id;
           return (
             <button
               key={h.id}
               onClick={() => onHorizonChange(h.id)}
-              className={`flex flex-col items-center justify-center rounded-xl px-3 py-2 text-xs font-mono transition-all duration-200 ${
+              className={`flex flex-col items-center justify-center rounded-lg px-3 py-2 text-xs font-mono transition-all duration-150 ${
                 isSelected
-                  ? 'border border-precursor-purple/60 bg-precursor-violet/60 text-white shadow-glow-purple/20'
-                  : 'border border-transparent text-slate-400 hover:border-white/[0.1] hover:bg-precursor-surface/60 hover:text-slate-200'
+                  ? 'border border-[#5267D8] bg-[#EEF2FF] text-[#5267D8] shadow-xs'
+                  : 'border border-[#E3E8F0] bg-white text-[#687386] hover:bg-[#F8FAFC] hover:text-[#202938]'
               }`}
             >
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-sm tracking-tight">{h.label}</span>
+                <span className="font-extrabold text-xs tracking-tight">{h.label}</span>
                 <span className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
-                  isSelected ? 'bg-precursor-purple text-navy-950 font-black' : 'bg-slate-800 text-slate-400'
+                  isSelected ? 'bg-[#5267D8] text-white' : 'bg-[#F1F5F9] text-[#64748B]'
                 }`}>
-                  {counts[h.id]}
+                  {counts[h.id] ?? 0}
                 </span>
               </div>
-              <span className="hidden sm:inline text-[10px] text-slate-400 mt-0.5 truncate max-w-xs">
+              <span className="text-[10px] text-[#687386] mt-0.5 truncate max-w-full text-center">
                 {h.desc}
               </span>
             </button>

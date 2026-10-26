@@ -224,20 +224,32 @@ export const NetworkNode3D: React.FC<NetworkNode3DProps> = ({
           className="pointer-events-none select-none"
         >
           <div
-            className={`flex items-center gap-2 rounded-lg border px-2.5 py-1 font-mono text-[11px] whitespace-nowrap shadow-xl backdrop-blur-md transition-all ${
+            className={`flex items-center gap-1.5 rounded-md border px-2 py-0.5 font-mono text-[11px] whitespace-nowrap shadow-sm backdrop-blur-sm transition-all ${
               isSelected
-                ? 'border-precursor-purple bg-precursor-violet/90 text-white shadow-glow-purple/40 ring-1 ring-precursor-purple'
+                ? 'border-[#5267D8] bg-white text-[#5267D8] shadow-md ring-2 ring-[#5267D8]/30 font-bold'
                 : internalHover
-                ? 'border-precursor-cyan bg-precursor-card/95 text-white shadow-glow-cyan/20'
-                : 'border-precursor-border bg-precursor-card/80 text-slate-300'
+                ? 'border-[#159E98] bg-white text-[#202938] shadow-md font-semibold'
+                : 'border-[#CBD5E1] bg-white/95 text-[#202938]'
             }`}
           >
             <span
-              className="h-2 w-2 rounded-full"
+              className="h-2 w-2 rounded-full shrink-0"
               style={{ backgroundColor: baseColor }}
             />
             <span className="font-bold">{node.name}</span>
-            <span className="text-[10px] uppercase text-slate-400">({node.type})</span>
+            <span className={`text-[9px] px-1 py-0.2 rounded font-semibold uppercase ${
+              node.id.includes('probe') || node.metadata?.role?.includes('Host') || node.metadata?.role?.includes('Peer')
+                ? 'bg-teal-50 text-teal-700 border border-teal-200'
+                : node.metadata?.role?.includes('Configured')
+                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                : 'bg-slate-100 text-slate-600 border border-slate-200'
+            }`}>
+              {node.id.includes('probe') || node.metadata?.role?.includes('Host') || node.metadata?.role?.includes('Peer')
+                ? 'Real'
+                : node.metadata?.role?.includes('Configured')
+                ? 'Config'
+                : 'Twin'}
+            </span>
           </div>
         </Html>
       )}
