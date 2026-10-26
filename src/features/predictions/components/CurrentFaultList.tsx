@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, Cpu } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Cpu } from 'lucide-react';
 import { CurrentFault } from '../types';
 
 interface CurrentFaultListProps {
@@ -7,6 +7,38 @@ interface CurrentFaultListProps {
 }
 
 export const CurrentFaultList: React.FC<CurrentFaultListProps> = ({ faults }) => {
+  if (faults.length === 0) {
+    return (
+      <div className="rounded-xl border border-emerald-200 dark:border-emerald-800/40 bg-white dark:bg-slate-900 p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-100 dark:border-emerald-900/30 pb-3">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-emerald-900 dark:text-emerald-300">
+              Immediate Faults (Active Outages)
+            </h3>
+            <span className="rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 font-mono text-[11px] text-emerald-700 dark:text-emerald-400 font-bold">
+              0 ACTIVE
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            <span>Zero-latency rule alerts • Interfaces Nominal</span>
+          </div>
+        </div>
+
+        <div className="py-4 text-center">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            No active physical faults or link outages detected.
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Physical NIC socket probes and rule thresholds are operating strictly within nominal boundaries.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-xl border border-rose-200 bg-white p-4 shadow-sm">
       {/* Header */}

@@ -16,16 +16,28 @@ export const IncidentsPage: React.FC = () => {
   const setSelectedIncidentId = useAppStore((s) => s.setSelectedIncidentId);
   const connectionState = useAppStore((s) => s.connectionState);
   const isConnected = connectionState === 'connected';
+  const operatingMode = useAppStore((s) => s.operatingMode);
+  const targetHost = useAppStore((s) => s.targetHost);
+  const targetPort = useAppStore((s) => s.targetPort);
 
   const [incidentsList, setIncidentsList] = useState<IncidentRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSeverity, setSelectedSeverity] = useState<IncidentSeverity | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<IncidentStatus | 'ALL'>('ALL');
   const [selectedCategory, setSelectedCategory] = useState<IncidentCategory | 'ALL'>('ALL');
-  const [selectedSource, setSelectedSource] = useState<'ALL' | 'SYNTHETIC' | 'LIVE'>('ALL');
+  const [selectedSource, setSelectedSource] = useState<'ALL' | 'SYNTHETIC' | 'LIVE'>(
+    operatingMode === 'live' ? 'LIVE' : 'ALL'
+  );
   const [selectedNode, setSelectedNode] = useState<string>('ALL');
   const [sortBy, setSortBy] = useState<'RECENT' | 'SEVERITY'>('RECENT');
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Sync source filter if mode changes to live
+  useEffect(() => {
+    if (operatingMode === 'live') {
+      setSelectedSource('LIVE');
+    }
+  }, [operatingMode]);
 
   useEffect(() => {
     let isMounted = true;
@@ -45,12 +57,12 @@ export const IncidentsPage: React.FC = () => {
     };
 
     loadIncidents();
-    const timer = setInterval(loadIncidents, 4000);
+    const timer = setInterval(loadIncidents, 3000);
     return () => {
       isMounted = false;
       clearInterval(timer);
     };
-  }, [isConnected]);
+  }, [isConnected, operatingMode]);
 
   // Derive unique nodes from currently loaded incident records
   const availableNodes = useMemo(() => {
@@ -94,8 +106,13 @@ export const IncidentsPage: React.FC = () => {
           return false;
         }
 
-        // Source filter (Live vs Synthetic)
-        if (selectedSource !== 'ALL') {
+        // In Live Mode, strictly exclude synthetic incidents
+        if (operatingMode === 'live') {
+          const incSource = (inc.source || 'synthetic').toLowerCase();
+          if (incSource !== 'live') {
+            return false;
+          }
+        } else if (selectedSource !== 'ALL') {
           const matchSource = selectedSource.toLowerCase();
           const incSource = (inc.source || 'synthetic').toLowerCase();
           if (incSource !== matchSource) {
@@ -125,7 +142,7 @@ export const IncidentsPage: React.FC = () => {
         // Recent sort: chronological or reverse ID
         return b.id.localeCompare(a.id);
       });
-  }, [incidentsList, searchQuery, selectedSeverity, selectedStatus, selectedCategory, selectedSource, selectedNode, sortBy]);
+  }, [incidentsList, searchQuery, selectedSeverity, selectedStatus, selectedCategory, selectedSource, selectedNode, sortBy, operatingMode]);
 
   const selectedIncident = useMemo(() => {
     if (selectedIncidentId) {
@@ -140,17 +157,25 @@ export const IncidentsPage: React.FC = () => {
     setSelectedSeverity('ALL');
     setSelectedStatus('ALL');
     setSelectedCategory('ALL');
-    setSelectedSource('ALL');
+    setSelectedSource(operatingMode === 'live' ? 'LIVE' : 'ALL');
     setSelectedNode('ALL');
     setSortBy('RECENT');
   };
 
   return (
     <PageContainer
-      title="Incidents"
-      subtitle="Presents detected incidents and reliability-gate decisions correlated across monitored systems."
+      title={operatingMode === 'live' ? `Incidents • Live Traffic Monitor (${targetHost}:${targetPort})` : "Incidents"}
+      subtitle={operatingMode === 'live'
+        ? `Physical network incidents detected in real time for Target PC ${targetHost}:${targetPort}. Synthetic scenario datasets are strictly excluded.`
+        : "Presents detected incidents and reliability-gate decisions correlated across monitored systems."
+      }
       action={
-        isConnected ? (
+        operatingMode === 'live' ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 animate-pulse">
+            <Radio className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+            <span>LIVE HARDWARE PROBE: {targetHost}:{targetPort}</span>
+          </span>
+        ) : isConnected ? (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-mono text-xs font-semibold text-emerald-700">
             <Radio className="h-3 w-3 text-emerald-600 animate-pulse" />
             <span>Live Incident Engine</span>
