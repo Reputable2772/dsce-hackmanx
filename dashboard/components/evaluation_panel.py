@@ -3,7 +3,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 def render_evaluation_panel(eval_data: Optional[Dict[str, Any]] = None) -> None:

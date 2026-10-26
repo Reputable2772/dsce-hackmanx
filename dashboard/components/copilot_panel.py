@@ -1,7 +1,7 @@
 """Offline Ollama Copilot diagnosis and Numerical Claim Verifier component."""
 
 import streamlit as st
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 
 def render_copilot_panel(
