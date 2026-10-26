@@ -25,6 +25,7 @@ import { IncidentRecord, IncidentStatus } from '../types';
 import { useAppStore } from '@/stores/useAppStore';
 import { apiClient } from '@/lib/api';
 import { PacketForensicsTab } from './PacketForensicsTab';
+import { HypothesisEntailmentMatrix } from '@/features/copilot/components/HypothesisEntailmentMatrix';
 
 interface IncidentDetailPanelProps {
   incident: IncidentRecord;
@@ -576,22 +577,10 @@ export const IncidentDetailPanel: React.FC<IncidentDetailPanelProps> = ({
           </div>
 
           <div className="space-y-2">
-            <h5 className="text-xs font-bold text-[#202938] font-mono">Detector Hypotheses</h5>
-            {hypotheses.length > 0 ? (
-              hypotheses.map((hyp) => (
-                <div key={hyp.id} className="rounded-lg border border-[#E3E8F0] bg-white p-3 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-[#202938]">{hyp.title}</span>
-                    <span className="rounded bg-[#EEF2FF] px-2 py-0.5 text-[10px] font-mono font-bold text-[#5267D8]">
-                      Likelihood: {hyp.likelihood}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[11px] text-[#687386]">{hyp.rationale}</p>
-                </div>
-              ))
-            ) : (
-              <span className="text-xs text-[#687386] italic">No active hypotheses recorded.</span>
-            )}
+            <HypothesisEntailmentMatrix
+              hypotheses={hypotheses}
+              assumptions={[]}
+            />
           </div>
         </div>
       )}

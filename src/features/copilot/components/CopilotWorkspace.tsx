@@ -3,7 +3,6 @@ import {
   Send, 
   RotateCcw, 
   Activity, 
-  HelpCircle, 
   FileText, 
   Copy, 
   Check, 
@@ -23,6 +22,7 @@ import {
 import { SUGGESTED_PROMPTS } from '../fixtures/copilotFixture';
 import { useAppStore } from '@/stores/useAppStore';
 import { apiClient } from '@/lib/api';
+import { HypothesisEntailmentMatrix } from './HypothesisEntailmentMatrix';
 
 export const CopilotWorkspace: React.FC = () => {
   const selectedIncidentId = useAppStore((s) => s.selectedIncidentId);
@@ -130,6 +130,25 @@ export const CopilotWorkspace: React.FC = () => {
           detail: h,
           confidence: 'Moderate' as const,
         })),
+        verifiedHypotheses: (resp.verified_hypotheses || resp.structured_hypotheses || []).map((h: any, idx: number) => ({
+          id: h.id || `H${idx + 1}`,
+          statement: h.statement || h.detail || String(h),
+          confidence: typeof h.confidence === 'number' ? h.confidence : 0.8,
+          rationale: h.rationale || '',
+          supporting_assumptions: Array.isArray(h.supporting_assumptions) ? h.supporting_assumptions : [],
+          status: h.status || 'UNVERIFIED',
+          entailment_explanation: h.entailment_explanation,
+        })),
+        assumptions: (resp.assumptions || []).map((a: any) => ({
+          id: a.id,
+          statement: a.statement,
+          metric_id: a.metric_id,
+          operator: a.operator,
+          expected_value: a.expected_value,
+          actual_value: a.actual_value,
+          status: a.status,
+          explanation: a.explanation,
+        })),
         diagnosticSteps: (resp.diagnostic_commands || []).map((cmd: string, idx: number) => ({
           step: idx + 1,
           command: cmd,
@@ -214,6 +233,25 @@ export const CopilotWorkspace: React.FC = () => {
           title: `Hypothesis ${idx + 1}`,
           detail: h,
           confidence: 'Moderate' as const,
+        })),
+        verifiedHypotheses: (resp.verified_hypotheses || resp.structured_hypotheses || []).map((h: any, idx: number) => ({
+          id: h.id || `H${idx + 1}`,
+          statement: h.statement || h.detail || String(h),
+          confidence: typeof h.confidence === 'number' ? h.confidence : 0.8,
+          rationale: h.rationale || '',
+          supporting_assumptions: Array.isArray(h.supporting_assumptions) ? h.supporting_assumptions : [],
+          status: h.status || 'UNVERIFIED',
+          entailment_explanation: h.entailment_explanation,
+        })),
+        assumptions: (resp.assumptions || []).map((a: any) => ({
+          id: a.id,
+          statement: a.statement,
+          metric_id: a.metric_id,
+          operator: a.operator,
+          expected_value: a.expected_value,
+          actual_value: a.actual_value,
+          status: a.status,
+          explanation: a.explanation,
         })),
         diagnosticSteps: (resp.diagnostic_commands || []).map((cmd: string, idx: number) => ({
           step: idx + 1,
@@ -436,25 +474,16 @@ export const CopilotWorkspace: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* 2. Diagnostic Hypotheses (EXPLICITLY HYPOTHESES) */}
+                  {/* 2. Diagnostic Hypotheses & Entailment Matrix */}
                   <div>
-                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-amber-700 flex items-center gap-1">
-                      <HelpCircle className="h-3 w-3 text-amber-600" />
-                      <span>Diagnostic Hypotheses (Unconfirmed Explanations):</span>
-                    </span>
-                    <div className="mt-1.5 space-y-1.5">
-                      {msg.structuredResponse.hypotheses.map((h, i) => (
-                        <div key={i} className="rounded-lg border border-amber-200 bg-amber-50/60 p-2 text-[11px]">
-                          <div className="flex justify-between items-center text-amber-900 font-semibold">
-                            <span>[HYPOTHESIS] {h.title}</span>
-                            <span className="rounded bg-amber-100 border border-amber-200 px-1.5 py-0.2 text-[9px] font-mono text-amber-800">
-                              Confidence: {h.confidence}
-                            </span>
-                          </div>
-                          <p className="mt-0.5 text-amber-900/80 text-[10px] leading-relaxed">{h.detail}</p>
-                        </div>
-                      ))}
-                    </div>
+                    <HypothesisEntailmentMatrix
+                      hypotheses={
+                        msg.structuredResponse.verifiedHypotheses && msg.structuredResponse.verifiedHypotheses.length > 0
+                          ? msg.structuredResponse.verifiedHypotheses
+                          : msg.structuredResponse.hypotheses
+                      }
+                      assumptions={msg.structuredResponse.assumptions || []}
+                    />
                   </div>
 
                   {/* 3. Recommended Checks & Diagnostic Steps (NEVER AUTO-EXECUTED) */}

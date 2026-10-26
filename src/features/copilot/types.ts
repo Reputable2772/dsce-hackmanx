@@ -18,10 +18,38 @@ export interface CopilotEvidenceItem {
   context: string;
 }
 
+export type HypothesisStatus = 'VALIDATED' | 'REFUTED' | 'UNVERIFIED';
+export type AssumptionStatus = 'VALIDATED' | 'VIOLATED' | 'UNTESTABLE';
+
+export interface AuditedAssumption {
+  id?: string;
+  statement: string;
+  metric_id?: string | null;
+  operator?: string | null;
+  expected_value?: number | null;
+  actual_value?: number | null;
+  status: AssumptionStatus;
+  explanation?: string;
+}
+
+export interface VerifiedHypothesis {
+  id: string;
+  statement: string;
+  confidence: number;
+  rationale?: string;
+  supporting_assumptions?: string[];
+  status: HypothesisStatus;
+  entailment_explanation?: string;
+}
+
 export interface CopilotHypothesis {
   title: string;
   detail: string;
   confidence: 'High' | 'Moderate' | 'Low';
+  id?: string;
+  status?: HypothesisStatus;
+  supporting_assumptions?: string[];
+  entailment_explanation?: string;
 }
 
 export interface CopilotDiagnosticCommand {
@@ -47,6 +75,8 @@ export interface CopilotStructuredResponse {
   rollbackConsiderations: string;
   runbookReferences: CopilotRunbookRef[];
   claims: ClaimVerificationRecord[];
+  assumptions?: AuditedAssumption[];
+  verifiedHypotheses?: VerifiedHypothesis[];
   modelUsed: string;
 }
 

@@ -19,6 +19,7 @@ import {
 import { useBreachNotifications, playAlertSound } from '@/features/alerts/useBreachNotifications';
 import { useAppStore } from '@/stores/useAppStore';
 import { apiClient } from '@/lib/api';
+import { HypothesisEntailmentMatrix } from '@/features/copilot/components/HypothesisEntailmentMatrix';
 
 export const BreachAlertBanner: React.FC = () => {
   const { activeAlert, dismissAlert, permissionGranted, requestPermission } = useBreachNotifications();
@@ -202,24 +203,21 @@ export const BreachAlertBanner: React.FC = () => {
               </div>
             ) : copilotData ? (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
-                {/* Hypothesis & Summary */}
-                <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-2">
-                  <span className="text-[10px] uppercase font-bold text-indigo-400 tracking-wider">
-                    Grounded Hypothesis
-                  </span>
-                  <p className="text-slate-300 leading-relaxed font-sans text-xs">
-                    {copilotData.summary || 'Anomalous telemetry deviation detected.'}
-                  </p>
-                  {copilotData.structured_hypotheses && copilotData.structured_hypotheses.length > 0 && (
-                    <div className="mt-2 space-y-1 pt-2 border-t border-slate-800/80">
-                      {copilotData.structured_hypotheses.map((h: any, idx: number) => (
-                        <div key={idx} className="flex items-start gap-1.5 text-[11px] text-slate-400">
-                          <span className="text-indigo-400 font-bold">•</span>
-                          <span>{h.statement} {h.confidence && <span className="text-emerald-400 font-semibold">({Math.round(h.confidence * 100)}%)</span>}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                {/* Hypothesis & Entailment Matrix */}
+                <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-3">
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-indigo-400 tracking-wider">
+                      Grounded AI Explanation
+                    </span>
+                    <p className="text-slate-300 leading-relaxed font-sans text-xs">
+                      {copilotData.summary || 'Anomalous telemetry deviation detected.'}
+                    </p>
+                  </div>
+                  <HypothesisEntailmentMatrix
+                    hypotheses={copilotData.verified_hypotheses || copilotData.structured_hypotheses || copilotData.hypotheses || []}
+                    assumptions={copilotData.assumptions || []}
+                    isCompact={true}
+                  />
                 </div>
 
                 {/* Diagnostic Commands with One-Click Copy */}
