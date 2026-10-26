@@ -76,7 +76,7 @@ export const TelemetryChartSection: React.FC<TelemetryChartSectionProps> = ({
 }) => {
   const [showEventWindows, setShowEventWindows] = useState(true);
   const [showThresholds, setShowThresholds] = useState(true);
-  const [activeTab, setActiveTab] = useState<'latency_loss' | 'throughput_jitter'>('latency_loss');
+  const [activeTab, setActiveTab] = useState<'latency_loss' | 'packet_flow' | 'throughput_jitter'>('latency_loss');
 
   return (
     <div className="space-y-4">
@@ -115,23 +115,39 @@ export const TelemetryChartSection: React.FC<TelemetryChartSectionProps> = ({
           </label>
 
           {/* View Tab Selector */}
-          <div className="flex rounded-lg border border-white/[0.1] bg-precursor-surface p-0.5">
+          <div className="flex rounded-lg border border-[#E3E8F0] bg-[#F8FAFC] p-1">
             <button
+              id="tab-btn-latency-loss"
+              type="button"
               onClick={() => setActiveTab('latency_loss')}
-              className={`rounded-md px-2.5 py-1 text-xs font-bold transition ${
+              className={`cursor-pointer rounded-md px-3 py-1 text-xs font-bold transition ${
                 activeTab === 'latency_loss'
-                  ? 'bg-precursor-purple text-white shadow-glow-purple/20'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-[#5267D8] text-white shadow-sm'
+                  : 'text-[#687386] hover:text-[#202938]'
               }`}
             >
               Latency & Loss
             </button>
             <button
+              id="tab-btn-packet-flow"
+              type="button"
+              onClick={() => setActiveTab('packet_flow')}
+              className={`cursor-pointer rounded-md px-3 py-1 text-xs font-bold transition ${
+                activeTab === 'packet_flow'
+                  ? 'bg-[#5267D8] text-white shadow-sm'
+                  : 'text-[#687386] hover:text-[#202938]'
+              }`}
+            >
+              Packet Flow (pkts/s)
+            </button>
+            <button
+              id="tab-btn-throughput-jitter"
+              type="button"
               onClick={() => setActiveTab('throughput_jitter')}
-              className={`rounded-md px-2.5 py-1 text-xs font-bold transition ${
+              className={`cursor-pointer rounded-md px-3 py-1 text-xs font-bold transition ${
                 activeTab === 'throughput_jitter'
-                  ? 'bg-precursor-purple text-white shadow-glow-purple/20'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-[#5267D8] text-white shadow-sm'
+                  : 'text-[#687386] hover:text-[#202938]'
               }`}
             >
               Throughput & Errors
@@ -255,6 +271,86 @@ export const TelemetryChartSection: React.FC<TelemetryChartSectionProps> = ({
               </ResponsiveContainer>
             </div>
           </div>
+        ) : activeTab === 'packet_flow' ? (
+          <div>
+            <div className="mb-2 flex items-center justify-between text-xs text-slate-600 font-mono">
+              <span className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-sm" />
+                <span className="text-emerald-700 font-semibold">Inbound Packets (RX, pkts/s)</span>
+                <span className="h-2.5 w-2.5 rounded-full bg-indigo-500 ml-4 shadow-sm" />
+                <span className="text-indigo-700 font-semibold">Outbound Packets (TX, pkts/s)</span>
+              </span>
+              <span className="text-[11px] text-slate-500">
+                Physical Network Interface Packet Flow (Arrival & Transmission Rate)
+              </span>
+            </div>
+
+            <div className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorRxPackets" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#10B981" stopOpacity={0.02} />
+                    </linearGradient>
+                    <linearGradient id="colorTxPackets" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366F1" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#6366F1" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+
+                  <XAxis 
+                    dataKey="timeLabel" 
+                    stroke="#CBD5E1" 
+                    tick={{ fill: '#64748B', fontSize: 11 }}
+                    interval={5}
+                  />
+
+                  <YAxis 
+                    stroke="#10B981" 
+                    tick={{ fill: '#059669', fontSize: 11 }}
+                    domain={[0, 'auto']}
+                    unit=" p/s"
+                  />
+
+                  <Tooltip content={<CustomTooltip />} />
+
+                  {showThresholds && (
+                    <ReferenceLine 
+                      y={5000} 
+                      stroke="#F59E0B" 
+                      strokeDasharray="4 4" 
+                      label={{ value: 'Burst Warning 5k pps', fill: '#B45309', fontSize: 10, position: 'insideTopRight' }} 
+                    />
+                  )}
+
+                  <Area
+                    type="monotone"
+                    dataKey="packets_in_sec"
+                    name="Inbound Packets (RX)"
+                    stroke="#10B981"
+                    strokeWidth={2.5}
+                    fillOpacity={1}
+                    fill="url(#colorRxPackets)"
+                    connectNulls={false}
+                  />
+
+                  <Area
+                    type="monotone"
+                    dataKey="packets_out_sec"
+                    name="Outbound Packets (TX)"
+                    stroke="#6366F1"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#colorTxPackets)"
+                    connectNulls={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         ) : (
           <div>
             <div className="mb-2 flex items-center justify-between text-xs text-slate-400 font-mono">
@@ -292,7 +388,7 @@ export const TelemetryChartSection: React.FC<TelemetryChartSectionProps> = ({
                     yAxisId="left"
                     stroke="#159E98" 
                     tick={{ fill: '#159E98', fontSize: 11 }}
-                    domain={[400, 1100]}
+                    domain={[0, 'auto']}
                     unit="M"
                   />
 

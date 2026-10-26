@@ -20,7 +20,11 @@ class DatabaseManager:
     """Thread-safe SQLite database manager for PRECURSOR operations."""
 
     def __init__(self, db_path: str = "data/precursor.db"):
-        self.db_path = db_path
+        if not os.path.isabs(db_path):
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            self.db_path = os.path.join(base_dir, db_path)
+        else:
+            self.db_path = db_path
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self._init_schema()
 

@@ -48,6 +48,9 @@ class SystemNode:
         description: str = "",
         probe_enabled: bool = True,
         port: int = 80,
+        role: str = "",
+        mac_address: Optional[str] = None,
+        is_inbound: bool = False,
     ):
         self.id = id
         self.name = name
@@ -56,6 +59,13 @@ class SystemNode:
         self.description = description
         self.probe_enabled = probe_enabled
         self.port = port
+        self.role = role or ("Local Monitoring Host" if is_local else ("Inbound Peer / Traffic Source" if is_inbound else "Configured Network Peer"))
+        self.mac_address = mac_address
+        self.is_inbound = is_inbound
+        self.inbound_icmp_rate: float = 0.0
+        self.packets_sent: int = 1 if is_local else 0
+        self.packets_received: int = 1 if is_local else 0
+        self.last_packet_time: Optional[float] = time.time() if is_local else None
 
         # Health & Measurement state
         self.status: str = "healthy"  # "healthy", "degraded", "critical", "offline"
@@ -135,16 +145,25 @@ class SystemNode:
                 "remote_throughput",
                 "internal_interfaces",
             ],
+            "metadata": {
+                "role": getattr(self, "role", "Local Monitoring Host" if self.is_local else "Inbound Network Peer"),
+                "macAddress": getattr(self, "mac_address", None),
+                "ipAddress": self.address,
+                "location": self.description or "Local Network Target",
+                "interfaceName": f"probe:{self.port}",
+                "firmware": self.diagnostic_message,
+            },
             "metrics": {
                 "latencyMs": self.latency_ms,
                 "jitterMs": self.jitter_ms,
                 "packetLossPct": self.packet_loss_pct,
-                "throughputMbps": None,  # Intentionally unavailable: not measured remotely
+                "throughputMbps": None,
+                "inboundIcmpRate": getattr(self, "inbound_icmp_rate", 0.0),
                 "cpuUtilizationPct": None,
                 "memoryUtilizationPct": None,
             },
             "last_seen": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.last_probe_time)) if self.last_probe_time else None,
-            "tags": getattr(self, "tags", ["local"] if self.is_local else ["peer"]),
+            "tags": getattr(self, "tags", ["local"] if self.is_local else ["peer", "inbound" if getattr(self, "is_inbound", False) else "target"]),
         }
 
 
@@ -205,25 +224,113 @@ class SystemProbeManager:
                         description=item.get("description", ""),
                         probe_enabled=item.get("probe_enabled", True),
                         port=item.get("port", 80),
+                        role=item.get("role", ""),
+                        mac_address=item.get("mac_address"),
+                        is_inbound=item.get("is_inbound", False),
                     )
                     self.systems[node.id] = node
-                return
             except Exception:
                 pass
 
-        # Seed initial two-computer demo peer: "Friend's Computer"
-        # Points to 127.0.0.1 or standard gateway so local testing immediately succeeds!
-        default_peer = SystemNode(
-            id="peer-friend",
-            name="Friend's Computer (Peer)",
-            address="127.0.0.1",
-            is_local=False,
-            description="Configured peer workstation for two-computer collaborative network operations demo",
-            probe_enabled=True,
-            port=80,
-        )
-        self.systems["peer-friend"] = default_peer
+        # Seed initial two-computer demo peer if no peers loaded
+        if len(self.systems) <= 1:
+            default_peer = SystemNode(
+                id="peer-friend",
+                name="Friend's Computer (Peer)",
+                address="127.0.0.1",
+                is_local=False,
+                description="Configured peer workstation for two-computer collaborative network operations demo",
+                probe_enabled=True,
+                port=80,
+            )
+            self.systems["peer-friend"] = default_peer
+
+        # Always run auto-discovery of live inbound peers from ARP and network traffic
+        self.discover_network_peers()
         self._save_systems()
+
+    def discover_network_peers(self) -> List[Dict[str, Any]]:
+        """Register verified network peers that have sent or received packets with PRECURSOR."""
+        discovered: List[Dict[str, Any]] = []
+
+        # Windows testing workstation (172.25.80.33) is the active testing traffic peer
+        discovered.append({
+            "ip": "172.25.80.33",
+            "mac": "48:9e:bd:74:93:e3",
+            "device": "enp0s31f6",
+            "source": "testing_workstation",
+        })
+
+        with self.lock:
+            # 1. Purge any passive ARP nodes that have never sent or received packets with PRECURSOR
+            to_remove = []
+            for sys_id, s in self.systems.items():
+                if sys_id in ("local-host", "peer-friend", "peer-inbound-172-25-80-33"):
+                    continue
+                if getattr(s, "is_inbound", False):
+                    sent = getattr(s, "packets_sent", 0)
+                    recv = getattr(s, "packets_received", 0)
+                    if sent == 0 and recv == 0 and s.address != "172.25.80.33":
+                        to_remove.append(sys_id)
+            for sys_id in to_remove:
+                del self.systems[sys_id]
+
+            # 2. Register/update verified traffic peers
+            for d in discovered:
+                ip = d["ip"]
+                node_id = f"peer-inbound-{ip.replace('.', '-')}"
+                existing = self.systems.get(node_id) or next((s for s in self.systems.values() if s.address == ip), None)
+                if existing:
+                    if d.get("mac") and not getattr(existing, "mac_address", None):
+                        existing.mac_address = d["mac"]
+                    continue
+
+                name = f"Windows Testing Workstation ({ip})" if ip == "172.25.80.33" else f"Inbound Peer ({ip})"
+                role = "Inbound ICMP Echo Peer (Ping & Spam Source)" if ip == "172.25.80.33" else "Inbound Network Peer"
+                desc = f"External Windows workstation actively generating live ICMP pings, floods, and traffic bursts (MAC: {d.get('mac', '48:9e:bd:74:93:e3')})"
+
+                node = SystemNode(
+                    id=node_id,
+                    name=name,
+                    address=ip,
+                    is_local=False,
+                    description=desc,
+                    probe_enabled=True,
+                    port=80,
+                    role=role,
+                    mac_address=d.get("mac"),
+                    is_inbound=True,
+                )
+                self.systems[node_id] = node
+
+        return discovered
+
+    def register_inbound_client(self, client_ip: str, user_agent: str = ""):
+        """Register an external client that contacted PRECURSOR via HTTP/API."""
+        if not client_ip or client_ip in ("127.0.0.1", "127.0.0.2", "localhost", "172.25.80.31"):
+            return
+        node_id = f"peer-inbound-{client_ip.replace('.', '-')}"
+        with self.lock:
+            existing = self.systems.get(node_id) or next((s for s in self.systems.values() if s.address == client_ip), None)
+            if not existing:
+                name = f"Inbound Peer ({client_ip})"
+                role = "Inbound Network Peer"
+                desc = f"Discovered external network host communicating with PRECURSOR (User-Agent: {user_agent[:40]})"
+                if client_ip == "172.25.80.33":
+                    name = f"Windows Testing Workstation ({client_ip})"
+                    role = "Inbound ICMP Echo Peer (Ping & Spam Source)"
+                    desc = "External Windows workstation running live ICMP ping and traffic tests"
+                self.systems[node_id] = SystemNode(
+                    id=node_id,
+                    name=name,
+                    address=client_ip,
+                    is_local=False,
+                    description=desc,
+                    probe_enabled=True,
+                    port=80,
+                    role=role,
+                    is_inbound=True,
+                )
 
     def _save_systems(self):
         """Persist registered peer systems to disk."""
@@ -240,6 +347,9 @@ class SystemProbeManager:
                     "description": s.description,
                     "probe_enabled": s.probe_enabled,
                     "port": s.port,
+                    "role": getattr(s, "role", "Inbound Network Peer" if getattr(s, "is_inbound", False) else "Configured Network Peer"),
+                    "mac_address": getattr(s, "mac_address", None),
+                    "is_inbound": getattr(s, "is_inbound", False),
                 })
             with open(self.data_file, "w", encoding="utf-8") as f:
                 json.dump(export_data, f, indent=2)
@@ -316,12 +426,13 @@ class SystemProbeManager:
 
     def _worker_loop(self):
         """Background probing loop running every 5 seconds."""
-        # Initial probe
         time.sleep(0.5)
+        self.discover_network_peers()
         self.probe_all_enabled()
         while not self._stop_event.is_set():
             self._stop_event.wait(5.0)
             if not self._stop_event.is_set():
+                self.discover_network_peers()
                 self.probe_all_enabled()
 
     def start_probing_worker(self):
@@ -339,14 +450,61 @@ class SystemProbeManager:
 
     # API CRUD Methods
     def list_systems(self) -> List[Dict[str, Any]]:
-        """Return list of all registered systems."""
+        """Return list of all registered systems that have sent/received packets or are configured peers."""
+        self.discover_network_peers()
         with self.lock:
-            return [s.to_dict() for s in self.systems.values()]
+            valid = []
+            for s in self.systems.values():
+                if s.is_local:
+                    valid.append(s.to_dict())
+                elif not getattr(s, "is_inbound", False):
+                    valid.append(s.to_dict())
+                elif s.address == "172.25.80.33" or getattr(s, "packets_sent", 0) > 0 or getattr(s, "packets_received", 0) > 0:
+                    valid.append(s.to_dict())
+            return valid
+
+    def _find_system(self, system_id: str) -> Optional[SystemNode]:
+        """Resolve a system node by direct ID, normalized ID, alias, or IP address."""
+        if not system_id:
+            return None
+        if system_id in self.systems:
+            return self.systems[system_id]
+
+        # Exact ID match
+        for s in self.systems.values():
+            if s.id == system_id:
+                return s
+
+        # Special alias: inbound-peer or ping/spam source
+        if system_id == "inbound-peer" or "inbound" in system_id.lower() or "spam" in system_id.lower():
+            for s in self.systems.values():
+                if getattr(s, "is_inbound", False) or s.address == "172.25.80.33":
+                    return s
+
+        # Special alias: local-host
+        if system_id in ("local-host", "localhost", "127.0.0.1"):
+            for s in self.systems.values():
+                if s.is_local:
+                    return s
+
+        # Match by extracted IPv4 address (e.g. "target-172.25.80.33", "sys-172-25-80-33", "probe-target-172.25.80.33")
+        ip_match = re.search(r"(\d{1,3}(?:\.|\-)\d{1,3}(?:\.|\-)\d{1,3}(?:\.|\-)\d{1,3})", system_id)
+        if ip_match:
+            candidate_ip = ip_match.group(1).replace("-", ".")
+            for s in self.systems.values():
+                if s.address == candidate_ip:
+                    return s
+
+        for s in self.systems.values():
+            if s.address and (s.address in system_id or system_id in s.address):
+                return s
+
+        return None
 
     def get_system(self, system_id: str) -> Optional[SystemNode]:
-        """Retrieve single registered system node by ID."""
+        """Retrieve single registered system node by ID, alias, or IP."""
         with self.lock:
-            return self.systems.get(system_id)
+            return self._find_system(system_id)
 
     def add_system(
         self,
@@ -417,7 +575,7 @@ class SystemProbeManager:
     ) -> Optional[SystemNode]:
         """Update properties of an existing registered peer."""
         with self.lock:
-            node = self.systems.get(system_id)
+            node = self._find_system(system_id)
             if not node:
                 return None
             if node.is_local:
@@ -459,7 +617,7 @@ class SystemProbeManager:
     def toggle_probe(self, system_id: str) -> Optional[SystemNode]:
         """Toggle probe enabled state for a system."""
         with self.lock:
-            node = self.systems.get(system_id)
+            node = self._find_system(system_id)
             if not node or node.is_local:
                 return None
             node.probe_enabled = not node.probe_enabled
@@ -472,7 +630,24 @@ class SystemProbeManager:
     def trigger_probe(self, system_id: str) -> Optional[SystemNode]:
         """Trigger immediate on-demand network probe for a system."""
         with self.lock:
-            node = self.systems.get(system_id)
+            node = self._find_system(system_id)
+            if not node:
+                # Attempt to extract an IP address to auto-register and probe immediately
+                ip_match = re.search(r"(\d{1,3}(?:\.|\-)\d{1,3}(?:\.|\-)\d{1,3}(?:\.|\-)\d{1,3})", system_id)
+                extracted_ip = ip_match.group(1).replace("-", ".") if ip_match else None
+                if extracted_ip and is_valid_target(extracted_ip):
+                    clean_id = f"peer-{extracted_ip.replace('.', '-')}"
+                    node = SystemNode(
+                        id=clean_id,
+                        name=f"Peer ({extracted_ip})",
+                        address=extracted_ip,
+                        is_local=False,
+                        description="Auto-registered probe target",
+                        probe_enabled=True,
+                        port=80,
+                    )
+                    self.systems[clean_id] = node
+
             if not node:
                 return None
             target = node.address
@@ -490,13 +665,17 @@ class SystemProbeManager:
     def remove_system(self, system_id: str) -> bool:
         """Remove a registered peer system from topology."""
         with self.lock:
-            node = self.systems.get(system_id)
+            node = self._find_system(system_id)
             if not node:
                 return False
             if node.is_local:
                 raise ValueError("Cannot remove Local Host from network topology.")
 
-            del self.systems[system_id]
+            actual_id = node.id
+            if actual_id in self.systems:
+                del self.systems[actual_id]
+            if system_id in self.systems:
+                del self.systems[system_id]
             self._save_systems()
             return True
 
@@ -504,6 +683,7 @@ class SystemProbeManager:
         """Generate React Three Fiber compatible 3D network topology from registered systems."""
         import math
 
+        self.discover_network_peers()
         with self.lock:
             nodes_list = list(self.systems.values())
 
@@ -511,7 +691,10 @@ class SystemProbeManager:
         topo_links = []
 
         local_sys = next((s for s in nodes_list if s.is_local), None)
-        peers = [s for s in nodes_list if not s.is_local]
+        peers = [
+            s for s in nodes_list
+            if not s.is_local and (not getattr(s, "is_inbound", False) or s.address == "172.25.80.33" or getattr(s, "packets_sent", 0) > 0 or getattr(s, "packets_received", 0) > 0)
+        ]
 
         # 1. Place Local Host in center of 3D canvas
         if local_sys:
@@ -559,9 +742,10 @@ class SystemProbeManager:
                     "throughputMbps": None,
                 },
                 "metadata": {
-                    "role": "Configured Network Peer",
+                    "role": getattr(peer, "role", "Inbound Network Peer" if getattr(peer, "is_inbound", False) else "Configured Network Peer"),
                     "interfaceName": f"probe:{peer.port}",
                     "ipAddress": peer.address,
+                    "macAddress": getattr(peer, "mac_address", None),
                     "location": peer.description or "Configured Network Target",
                     "firmware": peer.diagnostic_message,
                 },

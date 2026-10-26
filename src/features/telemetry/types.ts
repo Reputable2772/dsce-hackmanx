@@ -5,6 +5,8 @@ export type MetricId =
   | 'jitter_ms' 
   | 'packet_loss_pct' 
   | 'throughput_mbps' 
+  | 'packets_in_sec'
+  | 'packets_out_sec'
   | 'interface_errors';
 
 export type TimeRange = '5m' | '15m' | '30m' | '1h';
@@ -24,6 +26,9 @@ export interface TelemetryPointRecord {
   jitter_ms: number | null;
   packet_loss_pct: number | null;
   throughput_mbps: number | null;
+  packets_in_sec?: number | null;
+  packets_out_sec?: number | null;
+  icmp_inbound_rate?: number | null;
   interface_errors: number | null;
   quality: MetricQuality;
   segment: NetworkSegment;

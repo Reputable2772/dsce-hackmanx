@@ -320,6 +320,10 @@ export class PrecursorApiClient {
     return res.json();
   }
 
+  public async triggerProbe(systemId: string): Promise<RegisteredSystem> {
+    return this.triggerSystemProbe(systemId);
+  }
+
   public async removeSystem(systemId: string): Promise<{ status: string; id: string }> {
     const res = await fetch(`${this.config.baseUrl}/api/systems/${systemId}`, {
       method: 'DELETE',

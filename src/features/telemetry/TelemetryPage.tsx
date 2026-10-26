@@ -55,6 +55,12 @@ export const TelemetryPage: React.FC = () => {
           if (m.id === 'throughput_mbps' && latest.throughput_mbps != null) {
             return { ...m, currentValue: Number(latest.throughput_mbps) };
           }
+          if (m.id === 'packets_in_sec' && (latest.packets_in_sec != null || latest.rx_packets_sec != null)) {
+            return { ...m, currentValue: Number(latest.packets_in_sec ?? latest.rx_packets_sec) };
+          }
+          if (m.id === 'packets_out_sec' && (latest.packets_out_sec != null || latest.tx_packets_sec != null)) {
+            return { ...m, currentValue: Number(latest.packets_out_sec ?? latest.tx_packets_sec) };
+          }
           if (m.id === 'interface_errors' && latest.drops_in != null) {
             return { ...m, currentValue: Number(latest.drops_in) };
           }
@@ -96,6 +102,9 @@ export const TelemetryPage: React.FC = () => {
                 jitter_ms: null,
                 packet_loss_pct: null,
                 throughput_mbps: null,
+                packets_in_sec: null,
+                packets_out_sec: null,
+                icmp_inbound_rate: null,
                 interface_errors: null,
                 quality: (pt.quality as MetricQuality) || 'good',
                 segment: 'edge-gateway',
@@ -111,6 +120,12 @@ export const TelemetryPage: React.FC = () => {
               entry.packet_loss_pct = val;
             } else if (pt.metric_id === 'throughput_mbps') {
               entry.throughput_mbps = val;
+            } else if (pt.metric_id === 'packets_in_sec' || pt.metric_id === 'rx_packets_sec') {
+              entry.packets_in_sec = val;
+            } else if (pt.metric_id === 'packets_out_sec' || pt.metric_id === 'tx_packets_sec') {
+              entry.packets_out_sec = val;
+            } else if (pt.metric_id === 'icmp_inbound_rate') {
+              entry.icmp_inbound_rate = val;
             } else if (pt.metric_id === 'drops_in' || pt.metric_id === 'interface_errors') {
               entry.interface_errors = val;
             }

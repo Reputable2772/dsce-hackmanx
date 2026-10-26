@@ -223,31 +223,47 @@ class PrecursorEngine:
             metadata={"protocol": "TCP/ICMP", "bandwidthGbps": 1.0},
         )
 
-        # 3. Discover and register Inbound Peers from ARP
-        arp_peers = self.live_collector.read_arp_peers()
+        # 3. Register Active Inbound Testing Peer (Windows testing workstation)
         inbound_ip = "172.25.80.33"
-        for p in arp_peers:
-            if p["ip"] not in ("172.25.80.1", "127.0.0.1", "172.25.80.31"):
-                inbound_ip = p["ip"]
-                break
+        inbound_mac = "48:9e:bd:74:93:e3"
+
+        icmp_rate_pt = next((pt for pt in batch.points if pt.metric_id == "icmp_inbound_rate"), None)
+        icmp_rate = float(icmp_rate_pt.value) if icmp_rate_pt and icmp_rate_pt.value is not None else 0.0
+
+        if icmp_rate > 200.0:
+            peer_status = "critical"
+            diag = f"Inbound ICMP flood / spam storm active: {round(icmp_rate, 1)} pkts/sec"
+        elif icmp_rate > 50.0:
+            peer_status = "degraded"
+            diag = f"Elevated inbound ICMP burst / spam: {round(icmp_rate, 1)} pkts/sec"
+        else:
+            peer_status = "healthy"
+            diag = "Inbound ICMP echo peer nominal"
+
+        peer_name = f"Windows Testing Workstation ({inbound_ip})" if inbound_ip == "172.25.80.33" else f"Inbound Peer ({inbound_ip})"
 
         self.system_registry.register_node(
             node_id="inbound-peer",
-            name=f"Inbound Peer ({inbound_ip})",
+            name=peer_name,
             node_type="endpoint",
             ip_address=inbound_ip,
-            status="healthy",
-            metrics={"latencyMs": 0.8, "packetLossPct": 0.0},
-            metadata={"role": "Inbound ICMP Echo Peer", "ipAddress": inbound_ip},
+            status=peer_status,
+            metrics={"latencyMs": 0.8, "packetLossPct": 0.0, "inboundRate": icmp_rate},
+            metadata={
+                "role": "Inbound ICMP Echo Peer (Ping & Spam Source)",
+                "ipAddress": inbound_ip,
+                "macAddress": inbound_mac,
+                "diagnostic": diag,
+            },
             position=[-3.5, 1.5, 0.0],
         )
         self.system_registry.register_link(
             source_id="inbound-peer",
             target_id="local-host",
-            status="active",
+            status="active" if peer_status != "critical" else "degraded",
             latency_ms=0.8,
             packet_loss_pct=0.0,
-            metadata={"protocol": "ICMP", "bandwidthGbps": 1.0},
+            metadata={"protocol": "ICMP", "bandwidthGbps": 1.0, "inboundRate": icmp_rate},
         )
 
         return self._evaluate_pipeline(batch.timestamp)
@@ -323,7 +339,17 @@ class PrecursorEngine:
 
         # 4. Telemetry Snapshot
         latest_telem: Dict[str, Optional[float]] = {}
-        for m in ["latency_ms", "jitter_ms", "packet_loss_pct", "throughput_mbps", "link_state", "drops_in"]:
+        for m in [
+            "latency_ms",
+            "jitter_ms",
+            "packet_loss_pct",
+            "throughput_mbps",
+            "packets_in_sec",
+            "packets_out_sec",
+            "icmp_inbound_rate",
+            "link_state",
+            "drops_in",
+        ]:
             _, vals, _ = self.buffer.get_series(m, current_time - 15.0, current_time)
             if len(vals) > 0 and not np.isnan(vals[-1]):
                 latest_telem[m] = round(float(vals[-1]), 2)

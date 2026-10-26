@@ -109,20 +109,23 @@ class LiveTelemetryCollector:
             self._recent_probes.append(True)
             return round(duration_ms, 2), MetricQuality.GOOD
         except (socket.timeout, ConnectionRefusedError, OSError):
-            duration_ms = (time.perf_counter() - start) * 1000.0
             sock.close()
-            # ConnectionRefused indicates host is reachable and rejected port (TCP RST received)
-            if duration_ms < 1500.0:
-                self._recent_probes.append(True)
-                return round(duration_ms, 2), MetricQuality.GOOD
 
         # Both ICMP and TCP failed / timed out
         self._recent_probes.append(False)
         return None, MetricQuality.MISSING
 
     def read_interface_stats(self) -> Dict[str, float]:
-        """Read rx/tx bytes, errors, and drops from /proc/net/dev on Linux."""
-        stats = {"rx_bytes": 0.0, "tx_bytes": 0.0, "rx_errors": 0.0, "rx_drops": 0.0, "link_up": 1.0}
+        """Read rx/tx bytes, packets, errors, and drops from /proc/net/dev on Linux."""
+        stats = {
+            "rx_bytes": 0.0,
+            "tx_bytes": 0.0,
+            "rx_packets": 0.0,
+            "tx_packets": 0.0,
+            "rx_errors": 0.0,
+            "rx_drops": 0.0,
+            "link_up": 1.0,
+        }
         proc_path = "/proc/net/dev"
         if os.path.exists(proc_path):
             try:
@@ -139,18 +142,22 @@ class LiveTelemetryCollector:
                         if iface == self.interface_id or self.interface_id in ("all", "*"):
                             data = parts[1].split()
                             stats["rx_bytes"] += float(data[0])
+                            stats["rx_packets"] += float(data[1])
                             stats["rx_errors"] += float(data[2])
                             stats["rx_drops"] += float(data[3])
                             stats["tx_bytes"] += float(data[8])
+                            stats["tx_packets"] += float(data[9])
                             matched = True
                 # If explicit interface_id not matched, fallback to first non-lo interface
                 if not matched and non_lo_lines:
                     iface, data = non_lo_lines[0]
                     self.interface_id = iface
                     stats["rx_bytes"] += float(data[0])
+                    stats["rx_packets"] += float(data[1])
                     stats["rx_errors"] += float(data[2])
                     stats["rx_drops"] += float(data[3])
                     stats["tx_bytes"] += float(data[8])
+                    stats["tx_packets"] += float(data[9])
             except Exception:
                 pass
         return stats
@@ -201,8 +208,10 @@ class LiveTelemetryCollector:
             loss_pct = 0.0 if rtt is not None else 100.0
             loss_quality = rtt_quality
 
-        # 3. Throughput calculation from byte counter deltas
+        # 3. Throughput and packet rate calculations from byte and packet counter deltas
         throughput_mbps = 0.0
+        packets_in_sec = 0.0
+        packets_out_sec = 0.0
         inbound_icmp_rate = 0.0
         if self._prev_stats is not None and self._prev_time is not None:
             dt = max(0.1, now - self._prev_time)
@@ -211,6 +220,13 @@ class LiveTelemetryCollector:
             )
             if delta_bytes >= 0:
                 throughput_mbps = round((delta_bytes * 8.0) / (dt * 1e6), 3)
+
+            delta_rx_pkts = stats["rx_packets"] - self._prev_stats.get("rx_packets", stats["rx_packets"])
+            delta_tx_pkts = stats["tx_packets"] - self._prev_stats.get("tx_packets", stats["tx_packets"])
+            if delta_rx_pkts >= 0:
+                packets_in_sec = round(delta_rx_pkts / dt, 1)
+            if delta_tx_pkts >= 0:
+                packets_out_sec = round(delta_tx_pkts / dt, 1)
 
             if self._prev_icmp_stats is not None:
                 delta_echos = icmp_stats["in_echos"] - self._prev_icmp_stats["in_echos"]
@@ -254,6 +270,22 @@ class LiveTelemetryCollector:
                 timestamp=now,
                 metric_id="throughput_mbps",
                 value=throughput_mbps,
+                quality=MetricQuality.GOOD,
+                source="live",
+                interface_id=self.interface_id,
+            ),
+            TelemetryPoint(
+                timestamp=now,
+                metric_id="packets_in_sec",
+                value=packets_in_sec,
+                quality=MetricQuality.GOOD,
+                source="live",
+                interface_id=self.interface_id,
+            ),
+            TelemetryPoint(
+                timestamp=now,
+                metric_id="packets_out_sec",
+                value=packets_out_sec,
                 quality=MetricQuality.GOOD,
                 source="live",
                 interface_id=self.interface_id,

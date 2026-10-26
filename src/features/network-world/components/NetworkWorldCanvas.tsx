@@ -1,9 +1,64 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { RotateCcw, Target, Tag, X, Box, Activity, PanelRightOpen, PanelRightClose, HelpCircle } from 'lucide-react';
 import { NetworkTopologyData, TopologyNodeData, TopologyLinkData } from '../types';
 import { NetworkScene } from './NetworkScene';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+
+function isWebGLSupported(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const canvas = document.createElement('canvas');
+    return Boolean(
+      window.WebGLRenderingContext &&
+        (canvas.getContext('webgl') || canvas.getContext('experimental-webgl'))
+    );
+  } catch {
+    return false;
+  }
+}
+
+interface WebGLErrorBoundaryProps {
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
+}
+
+interface WebGLErrorBoundaryState {
+  hasError: boolean;
+  errorMessage?: string;
+}
+
+export class WebGLErrorBoundary extends React.Component<WebGLErrorBoundaryProps, WebGLErrorBoundaryState> {
+  constructor(props: WebGLErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): WebGLErrorBoundaryState {
+    return { hasError: true, errorMessage: error.message };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.warn('WebGL Rendering caught by ErrorBoundary:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || (
+        <div className="flex h-full w-full flex-col items-center justify-center p-8 text-center bg-[#F8FAFC]">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 border border-indigo-200 text-[#5267D8]">
+            <Box className="h-6 w-6" />
+          </div>
+          <h4 className="text-sm font-bold text-[#202938]">3D Hardware Acceleration Fallback</h4>
+          <p className="mt-1.5 max-w-md text-xs text-[#687386] leading-relaxed">
+            WebGL context is currently unavailable in this browser session. The full network topology and telemetry are accessible via the <strong>Network Node List</strong> below.
+          </p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 interface NetworkWorldCanvasProps {
   topology: NetworkTopologyData;
@@ -35,6 +90,7 @@ export const NetworkWorldCanvas: React.FC<NetworkWorldCanvasProps> = ({
   const [, setHoveredLink] = useState<TopologyLinkData | null>(null);
   const [showLabels, setShowLabels] = useState(true);
   const { showParticles, setShowParticles } = useSettingsStore();
+  const webglSupported = useMemo(() => isWebGLSupported(), []);
 
   // Camera action: Reset view
   const handleResetCamera = () => {
@@ -180,26 +236,40 @@ export const NetworkWorldCanvas: React.FC<NetworkWorldCanvasProps> = ({
       </div>
 
       {/* 3D WebGL Canvas */}
-      <Canvas
-        camera={{ position: [0, 14, 26], fov: 45 }}
-        shadows
-        gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
-        className="cursor-grab active:cursor-grabbing"
-      >
-        <NetworkScene
-          topology={topology}
-          selectedNodeId={selectedNodeId}
-          selectedLinkId={selectedLinkId}
-          hoveredNode={hoveredNode}
-          showLabels={showLabels}
-          onSelectNode={onSelectNode}
-          onSelectLink={onSelectLink}
-          onHoverNode={setHoveredNode}
-          onHoverLink={setHoveredLink}
-          onClearSelection={handleClearSelection}
-          controlsRef={controlsRef}
-        />
-      </Canvas>
+      {webglSupported ? (
+        <WebGLErrorBoundary>
+          <Canvas
+            camera={{ position: [0, 14, 26], fov: 45 }}
+            shadows
+            gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
+            className="cursor-grab active:cursor-grabbing"
+          >
+            <NetworkScene
+              topology={topology}
+              selectedNodeId={selectedNodeId}
+              selectedLinkId={selectedLinkId}
+              hoveredNode={hoveredNode}
+              showLabels={showLabels}
+              onSelectNode={onSelectNode}
+              onSelectLink={onSelectLink}
+              onHoverNode={setHoveredNode}
+              onHoverLink={setHoveredLink}
+              onClearSelection={handleClearSelection}
+              controlsRef={controlsRef}
+            />
+          </Canvas>
+        </WebGLErrorBoundary>
+      ) : (
+        <div className="flex h-full w-full flex-col items-center justify-center p-8 text-center bg-[#F8FAFC]">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 border border-indigo-200 text-[#5267D8]">
+            <Box className="h-6 w-6" />
+          </div>
+          <h4 className="text-sm font-bold text-[#202938]">3D Hardware Acceleration Fallback</h4>
+          <p className="mt-1.5 max-w-md text-xs text-[#687386] leading-relaxed">
+            WebGL context is unavailable in this browser session. The full network topology and telemetry are accessible via the <strong>Network Node List</strong>.
+          </p>
+        </div>
+      )}
 
       {/* Bottom Floating Interaction Hint Ribbon */}
       <div className="absolute bottom-3 left-4 z-10 flex items-center gap-2 rounded-xl border border-[#E3E8F0] bg-white/90 px-3 py-1.5 font-mono text-[11px] text-[#687386] backdrop-blur-md pointer-events-none shadow-sm">

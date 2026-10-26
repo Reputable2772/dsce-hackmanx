@@ -78,6 +78,32 @@ export const INITIAL_METRIC_SUMMARIES: MetricSummary[] = [
     thresholdWarning: 5,
     thresholdCritical: 20,
     description: 'Physical layer FCS/CRC frame checksum invalidations or FIFO buffer drops.'
+  },
+  {
+    id: 'packets_in_sec',
+    label: 'Inbound Packets (RX)',
+    unit: 'pkts/s',
+    currentValue: 1250,
+    p95Value: 1420,
+    trend: 'stable',
+    trendPct: 0.0,
+    quality: 'good',
+    thresholdWarning: 10000,
+    thresholdCritical: 50000,
+    description: 'Incoming packet arrival rate on physical network interface.'
+  },
+  {
+    id: 'packets_out_sec',
+    label: 'Outbound Packets (TX)',
+    unit: 'pkts/s',
+    currentValue: 980,
+    p95Value: 1150,
+    trend: 'stable',
+    trendPct: 0.0,
+    quality: 'good',
+    thresholdWarning: 10000,
+    thresholdCritical: 50000,
+    description: 'Outgoing packet transmission rate on physical network interface.'
   }
 ];
 
@@ -192,6 +218,9 @@ export const GENERATE_TELEMETRY_SERIES = (): TelemetryPointRecord[] => {
       quality = 'invalid';
     }
 
+    const inPkts = throughput !== null ? Math.round(throughput * 85 + (Math.sin(i * 0.3) * 40)) : null;
+    const outPkts = throughput !== null ? Math.round(throughput * 70 + (Math.cos(i * 0.3) * 30)) : null;
+
     records.push({
       id: `pt-${i}`,
       timestamp: epoch,
@@ -200,6 +229,8 @@ export const GENERATE_TELEMETRY_SERIES = (): TelemetryPointRecord[] => {
       jitter_ms: jitter !== null ? Number(jitter.toFixed(2)) : null,
       packet_loss_pct: loss !== null ? Number(loss.toFixed(3)) : null,
       throughput_mbps: throughput !== null ? Number(throughput.toFixed(1)) : null,
+      packets_in_sec: inPkts,
+      packets_out_sec: outPkts,
       interface_errors: errors,
       quality,
       segment: i % 3 === 0 ? 'core-spines' : i % 3 === 1 ? 'aggregation-leaves' : 'edge-gateway',

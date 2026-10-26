@@ -9,11 +9,14 @@ import {
   Plus,
   Network,
   Cpu,
+  Table as TableIcon,
+  LayoutGrid,
 } from 'lucide-react';
 import { NetworkWorldCanvas } from './components/NetworkWorldCanvas';
 import { NodeDetailPanel } from './components/NodeDetailPanel';
 import { TopologyLegend } from './components/TopologyLegend';
 import { AddSystemModal } from './components/AddSystemModal';
+import { NetworkNodeList } from './components/NetworkNodeList';
 import { demoTopologyFixture } from './fixtures/topologyFixture';
 import { TopologyNodeData, TopologyLinkData, NetworkTopologyData } from './types';
 import { useAppStore } from '@/stores/useAppStore';
@@ -21,6 +24,7 @@ import { apiClient, RegisteredSystem } from '@/lib/api';
 
 export const NetworkWorldPage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'systems' | 'fabric'>('systems');
+  const [displayTab, setDisplayTab] = useState<'canvas' | 'table' | 'split'>('split');
   const [selectedNode, setSelectedNode] = useState<TopologyNodeData | null>(null);
   const [selectedLink, setSelectedLink] = useState<TopologyLinkData | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
@@ -113,13 +117,20 @@ export const NetworkWorldPage: React.FC = () => {
     setInspectorOpen(true);
   };
 
-  // Derive active topology, isolating live probe targets when in Live Mode
+  // Derive active topology, isolating live probe targets and inbound peers when in Live Mode
   const displayedTopology: NetworkTopologyData = useMemo(() => {
     if (operatingMode === 'live') {
       const liveNodes = topology.nodes.filter(
         (n) => n.id === 'local-host' || 
+               n.id === 'inbound-peer' ||
+               n.id.includes('inbound') ||
+               n.id.includes('172-25-80-33') ||
+               n.metadata?.ipAddress === '172.25.80.33' ||
+               n.name.toLowerCase().includes('windows') ||
+               n.name.toLowerCase().includes('inbound') ||
                n.name.toLowerCase().includes('probe') || 
                n.name.toLowerCase().includes('target') || 
+               n.name.toLowerCase().includes('peer') ||
                n.id.includes(targetHost) ||
                n.metadata?.ipAddress === targetHost ||
                n.type === 'endpoint'
@@ -132,7 +143,7 @@ export const NetworkWorldPage: React.FC = () => {
         return {
           ...topology,
           name: `Live Topology (${targetHost}:${targetPort})`,
-          description: `Active real-time probe topology monitoring physical link to target PC ${targetHost}:${targetPort}`,
+          description: `Active real-time probe topology monitoring physical link to target PC ${targetHost}:${targetPort} and inbound testing peer 172.25.80.33`,
           isDemoFixture: false,
           nodes: liveNodes,
           links: liveLinks.length > 0 ? liveLinks : [
@@ -153,18 +164,18 @@ export const NetworkWorldPage: React.FC = () => {
           ],
         };
       }
-      // Guaranteed 2-node physical topology between local monitoring host and secondary PC
+      // Guaranteed 3-node physical topology: Local host, Inbound testing workstation, and Outbound target
       return {
         id: 'live-target-network',
         name: `Live Topology (${targetHost}:${targetPort})`,
-        description: `Active physical interface (${interfaceId}) link to target PC (${targetHost}:${targetPort})`,
+        description: `Active physical interface (${interfaceId}) link to target PC (${targetHost}:${targetPort}) and inbound testing peer (172.25.80.33)`,
         isDemoFixture: false,
         nodes: [
           {
             id: 'local-host',
-            name: 'PRECURSOR Monitor Engine (Local Host)',
+            name: 'PRECURSOR Monitor Engine (172.25.80.31)',
             type: 'server' as const,
-            position: [-3.5, 0, 0] as [number, number, number],
+            position: [0, 0, 0] as [number, number, number],
             status: 'healthy' as const,
             metrics: {
               latencyMs: 0.1,
@@ -174,17 +185,38 @@ export const NetworkWorldPage: React.FC = () => {
             },
             metadata: {
               role: 'Monitoring Host (Local NIC)',
-              ipAddress: '127.0.0.1',
-              interfaceName: interfaceId || 'eth0',
-              location: 'Local Workstation',
+              ipAddress: '172.25.80.31',
+              interfaceName: interfaceId || 'enp0s31f6',
+              location: 'Local Host Station',
               firmware: 'PRECURSOR Engine v1.0',
+            },
+          },
+          {
+            id: 'peer-inbound-172-25-80-33',
+            name: 'Windows Testing Workstation (172.25.80.33)',
+            type: 'endpoint' as const,
+            position: [-4.0, 1.5, 0] as [number, number, number],
+            status: 'healthy' as const,
+            metrics: {
+              latencyMs: 1.0,
+              jitterMs: 0.2,
+              packetLossPct: 0.0,
+              throughputMbps: null,
+            },
+            metadata: {
+              role: 'Inbound ICMP Echo Peer (Ping & Spam Source)',
+              ipAddress: '172.25.80.33',
+              macAddress: '48:9e:bd:74:93:e3',
+              interfaceName: 'enp0s31f6',
+              location: 'External Windows PC',
+              firmware: 'Active ICMP Echo Client',
             },
           },
           {
             id: `probe-target-${targetHost}`,
             name: `Probe Target (${targetHost}:${targetPort})`,
             type: 'endpoint' as const,
-            position: [3.5, 0, 0] as [number, number, number],
+            position: [4.0, 1.5, 0] as [number, number, number],
             status: 'healthy' as const,
             metrics: {
               latencyMs: latestStatus?.latest_metrics?.latency_ms ?? 1.2,
@@ -203,6 +235,20 @@ export const NetworkWorldPage: React.FC = () => {
         ],
         links: [
           {
+            id: 'link-inbound-to-local',
+            sourceId: 'peer-inbound-172-25-80-33',
+            targetId: 'local-host',
+            status: 'active' as const,
+            utilizationPct: 8.0,
+            latencyMs: 1.0,
+            metadata: {
+              cableType: '1GbE Twisted Pair' as const,
+              bandwidthGbps: 1.0,
+              sourceInterface: 'eth0',
+              targetInterface: interfaceId || 'enp0s31f6',
+            },
+          },
+          {
             id: 'link-local-to-target',
             sourceId: 'local-host',
             targetId: `probe-target-${targetHost}`,
@@ -212,7 +258,7 @@ export const NetworkWorldPage: React.FC = () => {
             metadata: {
               cableType: '1GbE Twisted Pair' as const,
               bandwidthGbps: 1.0,
-              sourceInterface: interfaceId || 'eth0',
+              sourceInterface: interfaceId || 'enp0s31f6',
               targetInterface: `port:${targetPort}`,
             },
           },
@@ -318,6 +364,49 @@ export const NetworkWorldPage: React.FC = () => {
             </div>
           )}
 
+          {/* Display View Toggle: Split, Canvas, Table */}
+          <div className="flex items-center rounded-xl border border-[#E3E8F0] bg-[#F6F8FB] p-1 font-mono text-xs">
+            <button
+              type="button"
+              onClick={() => setDisplayTab('split')}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-semibold transition ${
+                displayTab === 'split'
+                  ? 'bg-white text-[#5267D8] shadow-sm'
+                  : 'text-[#687386] hover:text-[#202938]'
+              }`}
+              title="Side-by-side 3D canvas and node table"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Split View</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDisplayTab('canvas')}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-semibold transition ${
+                displayTab === 'canvas'
+                  ? 'bg-white text-[#5267D8] shadow-sm'
+                  : 'text-[#687386] hover:text-[#202938]'
+              }`}
+              title="Full 3D Topology Canvas"
+            >
+              <Network className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">3D Canvas</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDisplayTab('table')}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-semibold transition ${
+                displayTab === 'table'
+                  ? 'bg-white text-[#5267D8] shadow-sm'
+                  : 'text-[#687386] hover:text-[#202938]'
+              }`}
+              title="Network Node Table List"
+            >
+              <TableIcon className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Node List</span>
+            </button>
+          </div>
+
           {/* Add System Button (Peer Systems View) */}
           {viewMode === 'systems' && (
             <button
@@ -372,46 +461,66 @@ export const NetworkWorldPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Main 3D Viewport Container */}
-      <div className="relative flex-1 w-full h-full min-h-[580px] overflow-hidden rounded-2xl border border-[#E3E8F0] bg-white shadow-sm">
-        <NetworkWorldCanvas
-          topology={displayedTopology}
-          selectedNodeId={selectedNode?.id ?? null}
-          selectedLinkId={selectedLink?.id ?? null}
-          onSelectNode={handleSelectNode}
-          onSelectLink={handleSelectLink}
-          inspectorOpen={inspectorOpen}
-          onToggleInspector={() => setInspectorOpen(!inspectorOpen)}
-          legendOpen={legendOpen}
-          onToggleLegend={() => setLegendOpen(!legendOpen)}
-          className="h-full w-full"
-        />
-
-        {/* Sliding Contextual Inspector Drawer (Right) */}
-        {inspectorOpen && (
-          <div className="absolute right-3 top-3 bottom-3 w-full sm:w-[420px] max-w-[calc(100%-1.5rem)] z-30 flex flex-col rounded-2xl border border-[#E3E8F0] bg-white/95 backdrop-blur-xl p-4 shadow-xl overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E3E8F0] mb-3">
-              <span className="font-mono text-xs font-bold uppercase tracking-wider text-[#5267D8] flex items-center gap-2">
-                <span>{viewMode === 'systems' ? 'System Peer Inspector' : 'Fabric Element Inspector'}</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setInspectorOpen(false)}
-                className="rounded-lg p-1 text-[#687386] hover:text-[#202938] hover:bg-slate-100 transition"
-                title="Close Inspector Drawer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <NodeDetailPanel
-              selectedNode={selectedNode}
-              selectedLink={selectedLink}
-              allNodes={displayedTopology.nodes}
+      {/* Main View Area */}
+      <div className="space-y-4 flex-1 flex flex-col">
+        {/* 3D Viewport (when tab is split or canvas) */}
+        {(displayTab === 'split' || displayTab === 'canvas') && (
+          <div className={`relative w-full overflow-hidden rounded-2xl border border-[#E3E8F0] bg-white shadow-sm ${
+            displayTab === 'split' ? 'h-[440px] shrink-0' : 'flex-1 min-h-[580px]'
+          }`}>
+            <NetworkWorldCanvas
+              topology={displayedTopology}
+              selectedNodeId={selectedNode?.id ?? null}
+              selectedLinkId={selectedLink?.id ?? null}
               onSelectNode={handleSelectNode}
-              onClear={handleClearSelection}
-              onRefreshTopology={loadTopology}
-              isPeerTopology={viewMode === 'systems'}
+              onSelectLink={handleSelectLink}
+              inspectorOpen={inspectorOpen}
+              onToggleInspector={() => setInspectorOpen(!inspectorOpen)}
+              legendOpen={legendOpen}
+              onToggleLegend={() => setLegendOpen(!legendOpen)}
+              className="h-full w-full"
+            />
+
+            {/* Sliding Contextual Inspector Drawer (Right) */}
+            {inspectorOpen && (
+              <div className="absolute right-3 top-3 bottom-3 w-full sm:w-[420px] max-w-[calc(100%-1.5rem)] z-30 flex flex-col rounded-2xl border border-[#E3E8F0] bg-white/95 backdrop-blur-xl p-4 shadow-xl overflow-y-auto">
+                <div className="flex items-center justify-between pb-3 border-b border-[#E3E8F0] mb-3">
+                  <span className="font-mono text-xs font-bold uppercase tracking-wider text-[#5267D8] flex items-center gap-2">
+                    <span>{viewMode === 'systems' ? 'System Peer Inspector' : 'Fabric Element Inspector'}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setInspectorOpen(false)}
+                    className="rounded-lg p-1 text-[#687386] hover:text-[#202938] hover:bg-slate-100 transition"
+                    title="Close Inspector Drawer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <NodeDetailPanel
+                  selectedNode={selectedNode}
+                  selectedLink={selectedLink}
+                  allNodes={displayedTopology.nodes}
+                  onSelectNode={handleSelectNode}
+                  onClear={handleClearSelection}
+                  onRefreshTopology={loadTopology}
+                  isPeerTopology={viewMode === 'systems'}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Network Node List (when tab is split or table) */}
+        {(displayTab === 'split' || displayTab === 'table') && (
+          <div className={`w-full ${displayTab === 'table' ? 'flex-1' : ''}`}>
+            <NetworkNodeList
+              nodes={displayedTopology.nodes}
+              selectedNodeId={selectedNode?.id ?? null}
+              onSelectNode={handleSelectNode}
+              onRefresh={loadTopology}
+              isLiveMode={operatingMode === 'live'}
             />
           </div>
         )}

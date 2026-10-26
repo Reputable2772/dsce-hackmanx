@@ -44,6 +44,7 @@ def resolve_scenario_type(name: Any, fallback: ScenarioType = ScenarioType.GRADU
     alias_map = {
         "normal": ScenarioType.NORMAL_BASELINE,
         "normal_baseline": ScenarioType.NORMAL_BASELINE,
+        "normal_operation": ScenarioType.NORMAL_BASELINE,
         "baseline": ScenarioType.NORMAL_BASELINE,
         "gradual": ScenarioType.GRADUAL_DEGRADATION,
         "gradual_degradation": ScenarioType.GRADUAL_DEGRADATION,
@@ -54,6 +55,8 @@ def resolve_scenario_type(name: Any, fallback: ScenarioType = ScenarioType.GRADU
         "surge": ScenarioType.TRAFFIC_SURGE,
         "slow_drift": ScenarioType.SLOW_DRIFT,
         "distribution_shift": ScenarioType.SLOW_DRIFT,
+        "distribution_shift_impact": ScenarioType.SLOW_DRIFT,
+        "distribution_shift_no_impact": ScenarioType.SLOW_DRIFT,
         "drift": ScenarioType.SLOW_DRIFT,
         "sensor_degradation": ScenarioType.SENSOR_DEGRADATION,
         "sensor": ScenarioType.SENSOR_DEGRADATION,
@@ -311,6 +314,8 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
             {"id": "link-lf3-srv1", "source": "sw-leaf-03", "target": "srv-storage-01", "speed": "10G", "status": "healthy"},
         ]
 
+
+
         return {
             "id": "precursor-fabric-01",
             "name": "Precursor Spine-Leaf Fabric Digital Twin",
@@ -386,6 +391,7 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
                 endpoint=self.path,
                 system_id=system_id,
             )
+            self.get_system_manager().register_inbound_client(client_ip, user_agent)
         except Exception:
             pass
 
@@ -914,6 +920,7 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
                 endpoint=self.path,
                 system_id=system_id,
             )
+            self.get_system_manager().register_inbound_client(client_ip, user_agent)
         except Exception:
             pass
 
@@ -1281,16 +1288,24 @@ _live_stream_running = True
 
 
 def _live_stream_worker():
-    """Background streaming thread that continuously samples live network telemetry when in live mode."""
+    """Background streaming thread that continuously samples live network telemetry or steps synthetic simulation."""
     while _live_stream_running:
         try:
             handler = PrecursorApiHandler
-            if handler.engine and getattr(handler.engine, "mode", None) == "live":
-                if handler.engine_lock:
-                    with handler.engine_lock:
+            if handler.engine:
+                engine_mode = getattr(handler.engine, "mode", "synthetic")
+                if engine_mode == "live":
+                    if handler.engine_lock:
+                        with handler.engine_lock:
+                            handler.engine.step_live()
+                    else:
                         handler.engine.step_live()
-                else:
-                    handler.engine.step_live()
+                elif engine_mode == "synthetic":
+                    if handler.engine_lock:
+                        with handler.engine_lock:
+                            handler.engine.step_simulation()
+                    else:
+                        handler.engine.step_simulation()
         except Exception:
             pass
         time.sleep(3.0)

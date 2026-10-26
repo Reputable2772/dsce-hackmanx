@@ -46,20 +46,32 @@ const defaultConfig: SimulationConfig = {
 export const useSimulationStore = create<SimulationStore>((set, get) => ({
   config: { ...defaultConfig },
   phase: 'idle',
-  timeline: [],
+  timeline: getTimelineForScenario(defaultConfig.scenarioId, defaultConfig.seed),
   activeStageIndex: 0,
-  evaluation: null,
+  evaluation: getEvaluationForScenario(defaultConfig.scenarioId),
   validationErrors: {},
 
-  setScenario: (id) =>
-    set((state) => ({
-      config: { ...state.config, scenarioId: id },
+  setScenario: (id) => {
+    const { config } = get();
+    const newConfig = { ...config, scenarioId: id };
+    const timeline = getTimelineForScenario(id, newConfig.seed);
+    const evaluation = getEvaluationForScenario(id);
+    set({
+      config: newConfig,
       phase: 'idle',
-      timeline: [],
+      timeline,
       activeStageIndex: 0,
-      evaluation: null,
+      evaluation,
       validationErrors: {},
-    })),
+    });
+
+    const isConnected = useAppStore.getState().connectionState === 'connected';
+    if (isConnected) {
+      apiClient.resetScenario(id, newConfig.seed)
+        .then(() => useAppStore.getState().checkLiveConnection())
+        .catch(() => {});
+    }
+  },
 
   setSeed: (seed) =>
     set((state) => ({
@@ -115,27 +127,33 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
     const isConnected = useAppStore.getState().connectionState === 'connected';
     if (isConnected) {
       try {
+        await apiClient.setMode('synthetic');
         await apiClient.resetScenario(config.scenarioId, config.seed);
         const evalRes = await apiClient.runEvaluation(config.scenarioId, config.seed);
         if (evalRes && evalRes.result) {
           const on5 = evalRes.result.gate_on?.['5'] || {};
           const off5 = evalRes.result.gate_off?.['5'] || {};
+          const recallVal = on5.event_recall ?? on5.recall;
+          const leadTimeVal = on5.average_lead_time_minutes ?? on5.warning_lead_time_minutes;
+          const offRecallVal = off5.event_recall ?? off5.recall;
+          const offLeadTimeVal = off5.average_lead_time_minutes ?? off5.warning_lead_time_minutes;
+
           evaluation = {
             scenarioId: config.scenarioId,
             scenarioName: config.scenarioId.replace(/_/g, ' ').toUpperCase(),
             seed: config.seed,
             gateOn: {
-              detectedEvents: on5.recall != null ? Math.round(on5.recall * 10) : 1,
+              detectedEvents: recallVal != null ? Math.round(Number(recallVal) * 10) : 1,
               falseAlarmsPerHour: Number(on5.false_alarms_per_hour ?? 0.0),
-              warningLeadTimeMinutes: Number(on5.warning_lead_time_minutes ?? 0.0),
+              warningLeadTimeMinutes: Number(leadTimeVal ?? 0.0),
               lateOrMissedEvents: Number(on5.missed_faults ?? 0),
               abstentionRate: Number(on5.abstention_rate ?? 0.0),
               totalPredictionWindows: 12,
             },
             gateOff: {
-              detectedEvents: off5.recall != null ? Math.round(off5.recall * 10) : 1,
+              detectedEvents: offRecallVal != null ? Math.round(Number(offRecallVal) * 10) : 1,
               falseAlarmsPerHour: Number(off5.false_alarms_per_hour ?? 0.0),
-              warningLeadTimeMinutes: Number(off5.warning_lead_time_minutes ?? 0.0),
+              warningLeadTimeMinutes: Number(offLeadTimeVal ?? 0.0),
               lateOrMissedEvents: Number(off5.missed_faults ?? 0),
               abstentionRate: Number(off5.abstention_rate ?? 0.0),
               totalPredictionWindows: 12,
@@ -143,6 +161,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
             explanation: `Reproducible evaluation benchmark executed against Python PrecursorEngine (seed ${config.seed}). Paired GATE ON vs GATE OFF run across 5m, 15m, and 30m horizons.`,
           };
         }
+        await useAppStore.getState().checkLiveConnection();
       } catch {
         // Fall back to deterministic evaluation fixture
       }
@@ -151,7 +170,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
     set({
       phase: 'completed',
       timeline,
-      activeStageIndex: 0,
+      activeStageIndex: Math.min(1, timeline.length - 1),
       evaluation,
     });
   },
@@ -164,9 +183,9 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
     set({
       config: { ...defaultConfig },
       phase: 'idle',
-      timeline: [],
+      timeline: getTimelineForScenario(defaultConfig.scenarioId, defaultConfig.seed),
       activeStageIndex: 0,
-      evaluation: null,
+      evaluation: getEvaluationForScenario(defaultConfig.scenarioId),
       validationErrors: {},
     });
   },
