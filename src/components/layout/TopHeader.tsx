@@ -3,7 +3,7 @@ import { useLocation, Link } from 'react-router-dom';
 import { 
   Menu, 
   Bell, 
-  Settings, 
+  Sliders, 
   ShieldCheck, 
   AlertTriangle, 
   ShieldAlert, 
@@ -12,6 +12,7 @@ import {
 import { useAppStore } from '@/stores/useAppStore';
 import { apiClient } from '@/lib/api';
 import { LiveProbeModal } from './LiveProbeModal';
+import { ThresholdsModal } from './ThresholdsModal';
 
 interface TopHeaderProps {
   onOpenMobileMenu: () => void;
@@ -56,6 +57,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onOpenMobileMenu }) => {
     checkLiveConnection,
   } = useAppStore();
   const [liveProbeOpen, setLiveProbeOpen] = useState(false);
+  const [thresholdsOpen, setThresholdsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [events, setEvents] = useState<OperationalEventItem[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -289,15 +291,16 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onOpenMobileMenu }) => {
           )}
         </div>
 
-        {/* Quick Link to Settings */}
-        <Link
-          to="/settings"
-          className="rounded-lg p-2 text-[#687386] transition-colors hover:bg-slate-100 hover:text-[#202938]"
-          title="Operational Settings"
-          aria-label="Settings"
+        {/* Detection & Gate Thresholds Tuning */}
+        <button
+          type="button"
+          onClick={() => setThresholdsOpen(true)}
+          className="rounded-lg p-2 text-[#687386] transition-colors hover:bg-slate-100 hover:text-[#202938] cursor-pointer"
+          title="Detection Engine & Reliability Gate Thresholds"
+          aria-label="Thresholds Configuration"
         >
-          <Settings className="h-4 w-4" />
-        </Link>
+          <Sliders className="h-4 w-4" />
+        </button>
       </div>
 
       {/* Live Hardware Probe & Ingestion Mode Modal */}
@@ -305,6 +308,12 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onOpenMobileMenu }) => {
         isOpen={liveProbeOpen}
         onClose={() => setLiveProbeOpen(false)}
         onModeChanged={() => checkLiveConnection()}
+      />
+
+      {/* Detection & Reliability Gate Thresholds Modal */}
+      <ThresholdsModal
+        isOpen={thresholdsOpen}
+        onClose={() => setThresholdsOpen(false)}
       />
     </header>
   );

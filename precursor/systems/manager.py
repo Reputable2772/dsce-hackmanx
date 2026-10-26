@@ -83,6 +83,11 @@ class SystemNode:
         self.last_probe_time = now
         self.diagnostic_message = diagnostic
 
+        # Track packets sent and received during probe execution
+        self.packets_sent = getattr(self, "packets_sent", 0) + 1
+        if success:
+            self.packets_received = getattr(self, "packets_received", 0) + 1
+
         # Append to rolling history
         self.probe_history.append({"time": now, "rtt": rtt, "success": success})
         if len(self.probe_history) > 10:
@@ -232,19 +237,6 @@ class SystemProbeManager:
             except Exception:
                 pass
 
-        # Seed initial two-computer demo peer if no peers loaded
-        if len(self.systems) <= 1:
-            default_peer = SystemNode(
-                id="peer-friend",
-                name="Friend's Computer (Peer)",
-                address="127.0.0.1",
-                is_local=False,
-                description="Configured peer workstation for two-computer collaborative network operations demo",
-                probe_enabled=True,
-                port=80,
-            )
-            self.systems["peer-friend"] = default_peer
-
         # Always run auto-discovery of live inbound peers from ARP and network traffic
         self.discover_network_peers()
         self._save_systems()
@@ -253,29 +245,39 @@ class SystemProbeManager:
         """Register verified network peers that have sent or received packets with PRECURSOR."""
         discovered: List[Dict[str, Any]] = []
 
-        # Windows testing workstation (172.25.80.33) is the active testing traffic peer
-        discovered.append({
-            "ip": "172.25.80.33",
-            "mac": "48:9e:bd:74:93:e3",
-            "device": "enp0s31f6",
-            "source": "testing_workstation",
-        })
+        # Read active network neighbors from /proc/net/arp on Linux
+        proc_arp = "/proc/net/arp"
+        if os.path.exists(proc_arp):
+            try:
+                with open(proc_arp, "r", encoding="utf-8") as f:
+                    for line in f.readlines()[1:]:
+                        parts = line.strip().split()
+                        if len(parts) >= 6:
+                            ip, flags, mac, device = parts[0], parts[2], parts[3], parts[5]
+                            if flags == "0x2" and mac != "00:00:00:00:00:00" and not ip.startswith("127."):
+                                discovered.append({
+                                    "ip": ip,
+                                    "mac": mac,
+                                    "device": device,
+                                    "source": "arp_neighbor",
+                                })
+            except Exception:
+                pass
 
         with self.lock:
-            # 1. Purge any passive ARP nodes that have never sent or received packets with PRECURSOR
+            # 1. Purge any nodes that have never sent or received packets with PRECURSOR
             to_remove = []
             for sys_id, s in self.systems.items():
-                if sys_id in ("local-host", "peer-friend", "peer-inbound-172-25-80-33"):
+                if sys_id == "local-host":
                     continue
-                if getattr(s, "is_inbound", False):
-                    sent = getattr(s, "packets_sent", 0)
-                    recv = getattr(s, "packets_received", 0)
-                    if sent == 0 and recv == 0 and s.address != "172.25.80.33":
-                        to_remove.append(sys_id)
+                sent = getattr(s, "packets_sent", 0)
+                recv = getattr(s, "packets_received", 0)
+                if sent == 0 and recv == 0:
+                    to_remove.append(sys_id)
             for sys_id in to_remove:
                 del self.systems[sys_id]
 
-            # 2. Register/update verified traffic peers
+            # 2. Update hardware MAC on any existing traffic peers
             for d in discovered:
                 ip = d["ip"]
                 node_id = f"peer-inbound-{ip.replace('.', '-')}"
@@ -283,31 +285,38 @@ class SystemProbeManager:
                 if existing:
                     if d.get("mac") and not getattr(existing, "mac_address", None):
                         existing.mac_address = d["mac"]
-                    continue
-
-                name = f"Windows Testing Workstation ({ip})" if ip == "172.25.80.33" else f"Inbound Peer ({ip})"
-                role = "Inbound ICMP Echo Peer (Ping & Spam Source)" if ip == "172.25.80.33" else "Inbound Network Peer"
-                desc = f"External Windows workstation actively generating live ICMP pings, floods, and traffic bursts (MAC: {d.get('mac', '48:9e:bd:74:93:e3')})"
-
-                node = SystemNode(
-                    id=node_id,
-                    name=name,
-                    address=ip,
-                    is_local=False,
-                    description=desc,
-                    probe_enabled=True,
-                    port=80,
-                    role=role,
-                    mac_address=d.get("mac"),
-                    is_inbound=True,
-                )
-                self.systems[node_id] = node
 
         return discovered
 
+    def register_outbound_target(self, ip: str, port: int = 80, rtt_ms: Optional[float] = None) -> Optional[SystemNode]:
+        """Register or update an actively probed outbound target host."""
+        if not ip or ip in ("127.0.0.1", "localhost", "0.0.0.0"):
+            return None
+        node_id = f"peer-outbound-{ip.replace('.', '-')}"
+        with self.lock:
+            node = self.systems.get(node_id) or next((s for s in self.systems.values() if s.address == ip), None)
+            if not node:
+                node = SystemNode(
+                    id=node_id,
+                    name=f"Probed Host ({ip})",
+                    address=ip,
+                    is_local=False,
+                    description=f"Outbound host actively probed for latency and link health (port {port})",
+                    probe_enabled=True,
+                    port=port,
+                    role="Outbound Probe Target",
+                    is_inbound=False,
+                )
+                self.systems[node_id] = node
+            node.packets_sent = getattr(node, "packets_sent", 0) + 1
+            if rtt_ms is not None:
+                node.last_probe_ms = rtt_ms
+                node.last_probe_status = "healthy" if rtt_ms < 50.0 else "degraded"
+            return node
+
     def register_inbound_client(self, client_ip: str, user_agent: str = ""):
-        """Register an external client that contacted PRECURSOR via HTTP/API."""
-        if not client_ip or client_ip in ("127.0.0.1", "127.0.0.2", "localhost", "172.25.80.31"):
+        """Register an external client that contacted PRECURSOR via HTTP/API or ICMP."""
+        if not client_ip or client_ip in ("127.0.0.1", "127.0.0.2", "localhost"):
             return
         node_id = f"peer-inbound-{client_ip.replace('.', '-')}"
         with self.lock:
@@ -315,12 +324,10 @@ class SystemProbeManager:
             if not existing:
                 name = f"Inbound Peer ({client_ip})"
                 role = "Inbound Network Peer"
-                desc = f"Discovered external network host communicating with PRECURSOR (User-Agent: {user_agent[:40]})"
-                if client_ip == "172.25.80.33":
-                    name = f"Windows Testing Workstation ({client_ip})"
-                    role = "Inbound ICMP Echo Peer (Ping & Spam Source)"
-                    desc = "External Windows workstation running live ICMP ping and traffic tests"
-                self.systems[node_id] = SystemNode(
+                desc = "Discovered external network host communicating with PRECURSOR"
+                if user_agent:
+                    desc += f" (User-Agent: {user_agent[:40]})"
+                node = SystemNode(
                     id=node_id,
                     name=name,
                     address=client_ip,
@@ -331,6 +338,9 @@ class SystemProbeManager:
                     role=role,
                     is_inbound=True,
                 )
+                self.systems[node_id] = node
+                existing = node
+            existing.packets_received = getattr(existing, "packets_received", 0) + 1
 
     def _save_systems(self):
         """Persist registered peer systems to disk."""
@@ -450,16 +460,14 @@ class SystemProbeManager:
 
     # API CRUD Methods
     def list_systems(self) -> List[Dict[str, Any]]:
-        """Return list of all registered systems that have sent/received packets or are configured peers."""
+        """Return list of all registered systems that have sent/received packets."""
         self.discover_network_peers()
         with self.lock:
             valid = []
             for s in self.systems.values():
                 if s.is_local:
                     valid.append(s.to_dict())
-                elif not getattr(s, "is_inbound", False):
-                    valid.append(s.to_dict())
-                elif s.address == "172.25.80.33" or getattr(s, "packets_sent", 0) > 0 or getattr(s, "packets_received", 0) > 0:
+                elif getattr(s, "packets_sent", 0) > 0 or getattr(s, "packets_received", 0) > 0:
                     valid.append(s.to_dict())
             return valid
 
@@ -693,7 +701,7 @@ class SystemProbeManager:
         local_sys = next((s for s in nodes_list if s.is_local), None)
         peers = [
             s for s in nodes_list
-            if not s.is_local and (not getattr(s, "is_inbound", False) or s.address == "172.25.80.33" or getattr(s, "packets_sent", 0) > 0 or getattr(s, "packets_received", 0) > 0)
+            if not s.is_local and (getattr(s, "packets_sent", 0) > 0 or getattr(s, "packets_received", 0) > 0 or getattr(s, "probe_enabled", False))
         ]
 
         # 1. Place Local Host in center of 3D canvas
@@ -712,7 +720,7 @@ class SystemProbeManager:
                 },
                 "metadata": {
                     "role": "Local Host (Observer)",
-                    "interfaceName": "eth0",
+                    "interfaceName": getattr(local_sys, "interface_name", None) or "server-nic",
                     "ipAddress": local_sys.address,
                     "location": "Local Host Environment",
                     "firmware": f"{platform.system()} {platform.release()}",

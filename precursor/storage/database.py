@@ -263,7 +263,7 @@ class DatabaseManager:
                     now,
                     None,
                     inc_data.get("status", "ACTIVE"),
-                    inc_data.get("interface_id", "eth0"),
+                    inc_data.get("interface_id") or "server-nic",
                     json.dumps(inc_data.get("evidence_summary", {})),
                     source,
                     inc_data.get("scenario_type"),
@@ -271,17 +271,19 @@ class DatabaseManager:
                 ))
 
                 # Add a notification event for new warning/critical incident
-                conn.execute("""
-                    INSERT INTO operational_events (timestamp, event_type, title, message, severity, related_incident_id)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (
-                    now,
-                    "INCIDENT_DETECTED",
-                    inc_data["title"],
-                    f"New {sev} event on {inc_data.get('interface_id', 'eth0')}: {inc_data['title']}",
-                    sev,
-                    inc_id,
-                ))
+                if sev in ("CRITICAL", "WARNING"):
+                    iface_label = inc_data.get("interface_id") or "server-nic"
+                    conn.execute("""
+                        INSERT INTO operational_events (timestamp, event_type, title, message, severity, related_incident_id)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (
+                        now,
+                        "INCIDENT_DETECTED",
+                        inc_data["title"],
+                        f"New {sev} event on {iface_label}: {inc_data['title']}",
+                        sev,
+                        inc_id,
+                    ))
 
             conn.commit()
             return inc_id

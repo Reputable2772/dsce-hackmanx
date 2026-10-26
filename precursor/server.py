@@ -619,13 +619,6 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
 
             elif norm_path.startswith("/api/incidents/"):
                 inc_id = norm_path.replace("/api/incidents/", "").strip()
-                match = next((i for i in snapshot.incidents if i.id == inc_id), None)
-                if match:
-                    res = match.model_dump()
-                    if hasattr(self.engine, "incident_states") and inc_id in self.engine.incident_states:
-                        res["status"] = self.engine.incident_states[inc_id]
-                    self._send_json(200, res)
-                    return
                 if hasattr(self.engine, "incident_db"):
                     rec = self.engine.incident_db.get_incident(inc_id)
                     if rec:
@@ -633,6 +626,13 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
                             rec["status"] = self.engine.incident_states[inc_id]
                         self._send_json(200, rec)
                         return
+                match = next((i for i in snapshot.incidents if i.id == inc_id), None)
+                if match:
+                    res = match.model_dump()
+                    if hasattr(self.engine, "incident_states") and inc_id in self.engine.incident_states:
+                        res["status"] = self.engine.incident_states[inc_id]
+                    self._send_json(200, res)
+                    return
                 if hasattr(self.engine, "db"):
                     db_row = self.engine.db.get_incident(inc_id)
                     if db_row:
@@ -1327,6 +1327,7 @@ def create_server(
     PrecursorApiHandler.engine_lock = threading.Lock()
     if PrecursorApiHandler.system_manager is None:
         PrecursorApiHandler.system_manager = SystemProbeManager()
+    engine.system_manager = PrecursorApiHandler.system_manager
 
     if _live_stream_thread is None or not _live_stream_thread.is_alive():
         _live_stream_thread = threading.Thread(target=_live_stream_worker, daemon=True, name="precursor-live-streamer")

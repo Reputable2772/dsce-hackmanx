@@ -7,8 +7,6 @@ import { IncidentsPage } from '@/features/incidents/IncidentsPage';
 import { HistoryPage } from '@/features/history/HistoryPage';
 import { CopilotPage } from '@/features/copilot/CopilotPage';
 import { SimulationLabPage } from '@/features/simulation/SimulationLabPage';
-import { SystemStatusPage } from '@/features/system-status/SystemStatusPage';
-import { SettingsPage } from '@/features/settings/SettingsPage';
 
 export const router = createBrowserRouter([
   {
@@ -46,14 +44,6 @@ export const router = createBrowserRouter([
       {
         path: 'simulation',
         element: <SimulationLabPage />,
-      },
-      {
-        path: 'status',
-        element: <SystemStatusPage />,
-      },
-      {
-        path: 'settings',
-        element: <SettingsPage />,
       },
     ],
   },

@@ -7,8 +7,6 @@ import {
   AlertOctagon,
   Bot,
   FlaskConical,
-  Server,
-  Settings,
   History,
   X
 } from 'lucide-react';
@@ -33,13 +31,11 @@ const primaryDestinations: NavDestination[] = [
   { name: 'Incidents', path: '/incidents', icon: AlertOctagon },
   { name: 'History', path: '/history', icon: History },
   { name: 'Copilot', path: '/copilot', icon: Bot },
-  { name: 'System Status', path: '/status', icon: Server },
 ];
 
 // Utility and secondary destinations
 const utilityDestinations: NavDestination[] = [
   { name: 'Simulation Lab', path: '/simulation', icon: FlaskConical },
-  { name: 'Settings', path: '/settings', icon: Settings },
 ];
 
 export const LeftSidebar: React.FC<LeftSidebarProps> = ({ onCloseMobile }) => {

@@ -54,7 +54,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   operatingMode: 'synthetic',
   targetHost: '1.1.1.1',
   targetPort: 80,
-  interfaceId: 'eth0',
+  interfaceId: 'auto',
   isAutoStreaming: false,
 
   setDemoMode: (demoMode) => {

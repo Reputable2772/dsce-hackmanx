@@ -4,7 +4,6 @@ import { Radio } from 'lucide-react';
 import { TelemetryControls } from './components/TelemetryControls';
 import { TelemetryMetricCards } from './components/TelemetryMetricCards';
 import { TelemetryChartSection } from './components/TelemetryChartSection';
-import { DataQualityPanel } from './components/DataQualityPanel';
 import { CustomIngestModal } from './components/CustomIngestModal';
 import { 
   INITIAL_METRIC_SUMMARIES, 
@@ -223,16 +222,16 @@ export const TelemetryPage: React.FC = () => {
               </span>
               <div>
                 <p className="font-semibold text-sm text-slate-900 dark:text-slate-100">
-                  Live Probe Mode: Monitoring Physical Traffic to <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold">{targetHost}:{targetPort}</span>
+                  Bidirectional Server Telemetry • Monitored NIC: <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold">{interfaceId || 'auto'}</span> • Outbound Target: <span className="font-mono text-indigo-700 dark:text-indigo-400 font-bold">{targetHost}:{targetPort}</span>
                 </p>
                 <p className="text-xs text-slate-600 dark:text-slate-400">
-                  Local NIC: <span className="font-mono font-medium">{interfaceId}</span> • Synthetic datasets strictly excluded • Showing real socket RTT, jitter, and packet loss
+                  Monitoring incoming RX packet flow, burst floods, and kernel buffer drops alongside active outbound probe RTT and packet loss.
                 </p>
               </div>
             </div>
             {livePoints.length === 0 && (
               <span className="text-xs font-mono text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700/50 px-2.5 py-1 rounded-md font-medium">
-                Awaiting probe samples... Click "Sample Live Probe" in Simulation Lab or wait for auto-stream
+                Awaiting probe samples... Click "Sample Now" or enable auto-stream
               </span>
             )}
           </div>
@@ -265,9 +264,6 @@ export const TelemetryPage: React.FC = () => {
           eventWindows={operatingMode === 'live' ? [] : TELEMETRY_EVENT_WINDOWS}
           timeRange={selectedRange}
         />
-
-        {/* Data Quality & Invalidation Guard Panel */}
-        <DataQualityPanel audit={qualityAudit} />
 
         {/* Custom Telemetry Ingest Modal */}
         <CustomIngestModal

@@ -57,7 +57,15 @@ class IncidentGrouper:
             existing_status = existing.status if existing and existing.status in ("ACKNOWLEDGED", "RESOLVED") else "ACTIVE"
 
             evidence = {a.metric_id: a.evidence for a in immediate_alerts}
-            title = f"CRITICAL: Immediate Link/Connectivity Failure on {interface_id}"
+            if "icmp_inbound_rate" in primary_metrics:
+                title = f"CRITICAL: Inbound ICMP Flood / Ping Storm on {interface_id}"
+            elif "drops_in" in primary_metrics:
+                title = f"CRITICAL: Inbound Interface Buffer Saturation / Frame Drops on {interface_id}"
+            elif "link_state" in primary_metrics or "packet_loss_pct" in primary_metrics:
+                title = f"CRITICAL: Immediate Link/Connectivity Failure on {interface_id}"
+            else:
+                title = f"CRITICAL: Active Network Flaw Detected on {interface_id}"
+
             inc = Incident(
                 id=inc_id,
                 title=title,
@@ -93,6 +101,17 @@ class IncidentGrouper:
             first_seen = existing.first_seen if existing and existing.first_seen else current_time
             existing_status = existing.status if existing and existing.status in ("ACKNOWLEDGED", "RESOLVED") else "ACTIVE"
 
+            if "icmp_inbound_rate" in all_metrics or "packets_in_sec" in all_metrics:
+                flaw_desc = "Inbound Packet Surge / Ping Flood"
+            elif "drops_in" in all_metrics:
+                flaw_desc = "NIC Buffer Saturation"
+            elif "latency_ms" in all_metrics or "jitter_ms" in all_metrics:
+                flaw_desc = "Outbound SLA Latency Degradation"
+            elif "packet_loss_pct" in all_metrics:
+                flaw_desc = "Outbound Packet Loss Surge"
+            else:
+                flaw_desc = f"Service Impact on {', '.join(all_metrics)}"
+
             if gate_decision.state == GateState.ABSTAIN:
                 status = "SUPPRESSED"
                 severity = IncidentSeverity.INFO
@@ -100,11 +119,11 @@ class IncidentGrouper:
             elif gate_decision.state == GateState.DEGRADED:
                 status = existing_status
                 severity = IncidentSeverity.WARNING
-                title = f"EARLY WARNING (Lower Trust): Potential degradation within {min_horizon}m on {interface_id}"
+                title = f"EARLY WARNING (Lower Trust): Potential {flaw_desc} within {min_horizon}m on {interface_id}"
             else:
                 status = existing_status
                 severity = IncidentSeverity.WARNING
-                title = f"EARLY WARNING: High confidence service impact predicted in {min_horizon}m on {interface_id}"
+                title = f"EARLY WARNING: High confidence {flaw_desc} predicted in {min_horizon}m on {interface_id}"
 
             evidence = {}
             supporting = []

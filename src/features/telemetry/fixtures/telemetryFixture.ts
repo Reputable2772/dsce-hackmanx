@@ -16,7 +16,7 @@ import {
 export const INITIAL_METRIC_SUMMARIES: MetricSummary[] = [
   {
     id: 'rtt_ms',
-    label: 'Round-Trip Latency',
+    label: 'Outbound Probe RTT',
     unit: 'ms',
     currentValue: 48.6,
     p95Value: 51.4,
@@ -25,11 +25,11 @@ export const INITIAL_METRIC_SUMMARIES: MetricSummary[] = [
     quality: 'good',
     thresholdWarning: 35.0,
     thresholdCritical: 50.0,
-    description: 'End-to-end synthetic probe transit time across the Spine-Leaf fabric.'
+    description: 'Active round-trip latency pinging configured target host.'
   },
   {
     id: 'jitter_ms',
-    label: 'Transit Jitter',
+    label: 'Outbound Probe Jitter',
     unit: 'ms',
     currentValue: 7.2,
     p95Value: 8.1,
@@ -38,11 +38,11 @@ export const INITIAL_METRIC_SUMMARIES: MetricSummary[] = [
     quality: 'good',
     thresholdWarning: 4.0,
     thresholdCritical: 8.0,
-    description: 'Statistical variation in inter-packet delay intervals.'
+    description: 'Statistical delay variance in successive outbound probe round-trips.'
   },
   {
     id: 'packet_loss_pct',
-    label: 'Packet Loss',
+    label: 'Outbound Probe Loss',
     unit: '%',
     currentValue: 2.15,
     p95Value: 2.40,
@@ -51,11 +51,11 @@ export const INITIAL_METRIC_SUMMARIES: MetricSummary[] = [
     quality: 'good',
     thresholdWarning: 0.50,
     thresholdCritical: 2.00,
-    description: 'Fraction of transmitted IP packets failing receipt acknowledgement.'
+    description: 'Fraction of outbound probe packets failing receipt acknowledgement from target.'
   },
   {
     id: 'throughput_mbps',
-    label: 'Traffic Throughput',
+    label: 'Network Throughput',
     unit: 'Mbps',
     currentValue: 742.0,
     p95Value: 955.0,
@@ -64,20 +64,7 @@ export const INITIAL_METRIC_SUMMARIES: MetricSummary[] = [
     quality: 'good',
     thresholdWarning: 600.0,
     thresholdCritical: 400.0,
-    description: 'Aggregated egress bandwidth utilization on leaf uplink interfaces.'
-  },
-  {
-    id: 'interface_errors',
-    label: 'Interface CRC / Drops',
-    unit: 'pkts/s',
-    currentValue: 12,
-    p95Value: 15,
-    trend: 'up',
-    trendPct: 95.0,
-    quality: 'good',
-    thresholdWarning: 5,
-    thresholdCritical: 20,
-    description: 'Physical layer FCS/CRC frame checksum invalidations or FIFO buffer drops.'
+    description: 'Aggregated physical bandwidth utilization across server network interface.'
   },
   {
     id: 'packets_in_sec',
@@ -88,9 +75,9 @@ export const INITIAL_METRIC_SUMMARIES: MetricSummary[] = [
     trend: 'stable',
     trendPct: 0.0,
     quality: 'good',
-    thresholdWarning: 10000,
-    thresholdCritical: 50000,
-    description: 'Incoming packet arrival rate on physical network interface.'
+    thresholdWarning: 2000,
+    thresholdCritical: 10000,
+    description: 'Physical incoming packet arrival rate on server network interface.'
   },
   {
     id: 'packets_out_sec',
@@ -101,9 +88,22 @@ export const INITIAL_METRIC_SUMMARIES: MetricSummary[] = [
     trend: 'stable',
     trendPct: 0.0,
     quality: 'good',
-    thresholdWarning: 10000,
-    thresholdCritical: 50000,
-    description: 'Outgoing packet transmission rate on physical network interface.'
+    thresholdWarning: 5000,
+    thresholdCritical: 20000,
+    description: 'Physical outgoing packet transmission rate from server network interface.'
+  },
+  {
+    id: 'interface_errors',
+    label: 'Inbound Buffer Drops',
+    unit: 'drops',
+    currentValue: 0,
+    p95Value: 0,
+    trend: 'stable',
+    trendPct: 0.0,
+    quality: 'good',
+    thresholdWarning: 5,
+    thresholdCritical: 20,
+    description: 'Kernel ring buffer overruns and fragment reassembly drops on server interface.'
   }
 ];
 

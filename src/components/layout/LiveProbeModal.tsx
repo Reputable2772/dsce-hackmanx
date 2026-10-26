@@ -12,7 +12,7 @@ export const LiveProbeModal: React.FC<LiveProbeModalProps> = ({ isOpen, onClose,
   const [currentMode, setCurrentMode] = useState<'synthetic' | 'live'>('synthetic');
   const [targetHost, setTargetHost] = useState('1.1.1.1');
   const [targetPort, setTargetPort] = useState(80);
-  const [interfaceId, setInterfaceId] = useState('eth0');
+  const [interfaceId, setInterfaceId] = useState('auto');
   const [isUpdating, setIsUpdating] = useState(false);
   const [isSampling, setIsSampling] = useState(false);
   const [isAutoPolling, setIsAutoPolling] = useState(false);
@@ -104,7 +104,7 @@ export const LiveProbeModal: React.FC<LiveProbeModalProps> = ({ isOpen, onClose,
           <div className="flex items-center gap-2">
             <Radio className="h-5 w-5 text-[#5267D8]" />
             <h3 className="font-mono text-base font-bold text-[#202938]">
-              Network Telemetry Ingestion Mode
+              Network Interface & Outbound Probe Target
             </h3>
           </div>
           <button
@@ -149,13 +149,13 @@ export const LiveProbeModal: React.FC<LiveProbeModalProps> = ({ isOpen, onClose,
           <div className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 mb-4 text-xs font-mono">
             <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
               <Activity className="h-3.5 w-3.5" />
-              Active Linux Socket & Interface Probe Configuration
+              Interface Ingestion & Outbound Socket Target
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] font-semibold text-[#687386] block mb-1">
-                  Target Host / IP
+                  Outbound Probe Target (IP / Host)
                 </label>
                 <input
                   type="text"
@@ -182,13 +182,13 @@ export const LiveProbeModal: React.FC<LiveProbeModalProps> = ({ isOpen, onClose,
 
             <div>
               <label className="text-[11px] font-semibold text-[#687386] block mb-1">
-                Local Network Interface (/proc/net/dev)
+                Monitored Local Network NIC (/proc/net/dev)
               </label>
               <input
                 type="text"
                 value={interfaceId}
                 onChange={(e) => setInterfaceId(e.target.value)}
-                placeholder="eth0"
+                placeholder="auto (e.g. wlp0s20f3)"
                 className="w-full rounded-lg border border-[#CBD5E1] bg-white px-2.5 py-1.5 text-xs text-[#202938] outline-none focus:border-[#5267D8]"
               />
             </div>

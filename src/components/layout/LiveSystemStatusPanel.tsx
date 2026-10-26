@@ -38,9 +38,11 @@ export const LiveSystemStatusPanel: React.FC = () => {
   // Extract actual backend fields
   const metrics = latestStatus?.latest_metrics;
   const latency = metrics?.latency_ms != null ? `${Number(metrics.latency_ms).toFixed(1)} ms` : '—';
-  const jitter = metrics?.jitter_ms != null ? `${Number(metrics.jitter_ms).toFixed(1)} ms` : '—';
   const packetLoss = metrics?.packet_loss_pct != null ? `${Number(metrics.packet_loss_pct).toFixed(1)}%` : '—';
   const throughput = metrics?.throughput_mbps != null ? `${Number(metrics.throughput_mbps).toFixed(0)} Mbps` : '—';
+  const packetsIn = metrics?.packets_in_sec != null ? `${Number(metrics.packets_in_sec).toFixed(0)} p/s` : (metrics?.rx_packets_sec != null ? `${Number(metrics.rx_packets_sec).toFixed(0)} p/s` : '—');
+  const packetsOut = metrics?.packets_out_sec != null ? `${Number(metrics.packets_out_sec).toFixed(0)} p/s` : (metrics?.tx_packets_sec != null ? `${Number(metrics.tx_packets_sec).toFixed(0)} p/s` : '—');
+  const icmpRate = metrics?.icmp_inbound_rate != null ? Number(metrics.icmp_inbound_rate) : null;
   const linkUp = metrics?.link_up;
   const linkState = linkUp !== undefined ? (linkUp ? 'UP' : 'DOWN') : (isConnected ? '10/10 UP' : '—');
   const dropsIn = metrics?.drops_in != null ? `${metrics.drops_in}` : (metrics?.errors_in != null ? `${metrics.errors_in}` : '0');
@@ -50,7 +52,7 @@ export const LiveSystemStatusPanel: React.FC = () => {
   const isLiveProbing = rawMode === 'live' || rawMode === 'live_probes';
   const dataSource = isLiveProbing ? 'LIVE' : 'SYNTHETIC';
   const scenarioLabel = isLiveProbing
-    ? 'Active Host & Peer Probing'
+    ? 'Active Server & Probe'
     : latestStatus?.scenario
     ? latestStatus.scenario.replace(/_/g, ' ')
     : activeScenario || '—';
@@ -128,20 +130,25 @@ export const LiveSystemStatusPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* 2x2 Telemetry Metric Matrix */}
+      {/* 2x3 Telemetry Metric Matrix */}
       <div className="my-2 grid grid-cols-2 gap-1.5 text-[10px] border-t border-b border-[#E3E8F0]/80 py-2">
         <div className="rounded bg-white p-1.5 border border-[#E3E8F0]">
-          <span className="text-[#687386] block text-[9px]">Latency</span>
+          <span className="text-emerald-700 font-semibold block text-[9px]">RX Arrival</span>
+          <span className="font-bold text-[#202938]">{packetsIn}</span>
+        </div>
+
+        <div className="rounded bg-white p-1.5 border border-[#E3E8F0]">
+          <span className="text-indigo-700 font-semibold block text-[9px]">TX Transmit</span>
+          <span className="font-bold text-[#202938]">{packetsOut}</span>
+        </div>
+
+        <div className="rounded bg-white p-1.5 border border-[#E3E8F0]">
+          <span className="text-[#687386] block text-[9px]">Probe RTT</span>
           <span className="font-bold text-[#202938]">{latency}</span>
         </div>
 
         <div className="rounded bg-white p-1.5 border border-[#E3E8F0]">
-          <span className="text-[#687386] block text-[9px]">Jitter</span>
-          <span className="font-bold text-[#202938]">{jitter}</span>
-        </div>
-
-        <div className="rounded bg-white p-1.5 border border-[#E3E8F0]">
-          <span className="text-[#687386] block text-[9px]">Packet Loss</span>
+          <span className="text-[#687386] block text-[9px]">Probe Loss</span>
           <span className={`font-bold ${metrics?.packet_loss_pct && metrics.packet_loss_pct > 1 ? 'text-rose-600' : 'text-[#202938]'}`}>
             {packetLoss}
           </span>
@@ -151,17 +158,26 @@ export const LiveSystemStatusPanel: React.FC = () => {
           <span className="text-[#687386] block text-[9px]">Throughput</span>
           <span className="font-bold text-[#202938]">{throughput}</span>
         </div>
+
+        <div className="rounded bg-white p-1.5 border border-[#E3E8F0]">
+          <span className="text-[#687386] block text-[9px]">Inbound Drops</span>
+          <span className={`font-bold ${Number(dropsIn) > 0 ? 'text-rose-600' : 'text-[#202938]'}`}>{dropsIn}</span>
+        </div>
       </div>
 
-      {/* Links & In Drops */}
+      {/* ICMP Inbound & Links */}
       <div className="space-y-0.5 text-[10px] text-[#687386]">
+        {icmpRate !== null && icmpRate > 0 && (
+          <div className="flex justify-between font-mono">
+            <span className="text-emerald-700 font-medium">Inbound ICMP:</span>
+            <span className={`font-bold ${icmpRate > 50 ? 'text-rose-600' : 'text-emerald-700'}`}>
+              {icmpRate.toFixed(1)} pkts/s
+            </span>
+          </div>
+        )}
         <div className="flex justify-between">
           <span>Link State:</span>
           <span className="font-semibold text-emerald-700">{linkState}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Incoming Drops:</span>
-          <span className="font-semibold text-[#202938]">{dropsIn} pkts</span>
         </div>
       </div>
 

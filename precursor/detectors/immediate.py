@@ -11,9 +11,10 @@ class ImmediateFaultDetector(BaseDetector):
     Flags is_immediate_fault = True, which bypasses gate suppression in all states.
     """
 
-    def __init__(self, metric_id: str = "link_state", down_value: float = 0.0):
+    def __init__(self, metric_id: str = "link_state", down_value: float = 0.0, comparison: str = "eq"):
         super().__init__(name="immediate", metric_id=metric_id)
         self.down_value = down_value
+        self.comparison = comparison
 
     def evaluate(
         self,
@@ -39,7 +40,12 @@ class ImmediateFaultDetector(BaseDetector):
             )
 
         latest_val = float(vals[-1])
-        is_fault = bool(latest_val == self.down_value)
+        if self.comparison == "gte":
+            is_fault = bool(latest_val >= self.down_value)
+        elif self.comparison == "lte":
+            is_fault = bool(latest_val <= self.down_value)
+        else:
+            is_fault = bool(latest_val == self.down_value)
 
         # Check packet loss 100% as secondary immediate fault if this is loss metric
         if self.metric_id == "packet_loss_pct" and latest_val >= 99.0:

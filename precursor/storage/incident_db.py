@@ -257,7 +257,7 @@ class IncidentDB:
                     now,
                     source,
                     title,
-                    severity,
+                    sev_str,
                     status,
                     category,
                     predicted_horizon_minutes,
@@ -265,9 +265,9 @@ class IncidentDB:
                     gate_state,
                     node_id,
                     interface_id,
-                    json.dumps(primary_metrics),
-                    json.dumps(telemetry_snapshot),
-                    json.dumps(packet_samples),
+                    json.dumps(metrics_list),
+                    json.dumps(snapshot_dict),
+                    json.dumps(samples_list),
                     summary,
                     json.dumps(hypotheses),
                     json.dumps(assumptions),
@@ -280,8 +280,9 @@ class IncidentDB:
             )
 
             # Relational granular packet insertion
-            for idx, p in enumerate(packet_samples):
-                pkt_id = p.get("packet_id") or f"pkt-{incident_id}-{idx:04d}"
+            for idx, p in enumerate(samples_list):
+                raw_pkt = p.get("packet_id") or f"idx-{idx:04d}"
+                pkt_id = f"{incident_id}_{raw_pkt}"
                 p_flags = p.get("flags", [])
                 flags_str = json.dumps(p_flags) if isinstance(p_flags, list) else str(p_flags)
                 labels_str = json.dumps(p.get("labels", {}))
@@ -335,7 +336,11 @@ class IncidentDB:
             packets = []
             for r in rows:
                 p_dict = dict(r)
-                p_dict["packet_id"] = p_dict["id"]
+                raw_id = p_dict["id"]
+                if raw_id.startswith(f"{incident_id}_"):
+                    p_dict["packet_id"] = raw_id[len(incident_id) + 1:]
+                else:
+                    p_dict["packet_id"] = raw_id
                 flags_val = r["flags"] or "[]"
                 try:
                     p_dict["flags"] = json.loads(flags_val) if flags_val.startswith("[") else [flags_val]

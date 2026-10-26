@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from precursor.telemetry.schema import TelemetryPoint
 from precursor.telemetry.buffer import TelemetryBuffer
-from precursor.telemetry.live_collector import LiveTelemetryCollector
+from precursor.telemetry.live_collector import LiveTelemetryCollector, get_default_network_info
 from precursor.telemetry.synthetic import (
     SyntheticTelemetryGenerator,
     SyntheticScenarioConfig,
@@ -65,8 +65,11 @@ class PrecursorEngine:
         self,
         scenario_type: ScenarioType = ScenarioType.GRADUAL_DEGRADATION,
         seed: int = 42,
-        interface_id: str = "eth0",
+        interface_id: str = "auto",
     ):
+        detected_iface, _ = get_default_network_info()
+        if interface_id in ("eth0", "auto", "", None) and detected_iface:
+            interface_id = detected_iface
         self.scenario_type = scenario_type
         self.seed = seed
         self.interface_id = interface_id
@@ -107,13 +110,19 @@ class PrecursorEngine:
         mode: str,
         target_host: str = "127.0.0.1",
         target_port: int = 80,
-        interface_id: str = "eth0",
+        interface_id: str = "auto",
     ) -> str:
         """Switch ingestion mode between 'synthetic' and 'live', ensuring clean buffer isolation."""
         mode_clean = mode.lower().strip()
         if mode_clean in ("live", "live_network", "live_probe"):
             was_mode = self.mode
             self.mode = "live"
+
+            detected_iface, _ = get_default_network_info()
+            if interface_id in ("eth0", "auto", "", None) and detected_iface:
+                interface_id = detected_iface
+            self.interface_id = interface_id
+
             if self.live_collector is None:
                 self.live_collector = LiveTelemetryCollector(
                     target_host=target_host,
@@ -137,6 +146,11 @@ class PrecursorEngine:
             effective_host = self.live_collector.target_host
             effective_port = self.live_collector.target_port
             effective_iface = self.live_collector.interface_id
+
+            # Register outbound target in system manager if connected
+            sys_mgr = getattr(self, "system_manager", None)
+            if sys_mgr:
+                sys_mgr.register_outbound_target(effective_host, effective_port)
 
             # Register monitored target node and link in system registry
             self.system_registry.register_node(
@@ -187,84 +201,84 @@ class PrecursorEngine:
             elif pt.metric_id == "packet_loss_pct":
                 loss_val = pt.value
 
-        target_ip = getattr(self.live_collector, "target_host", "172.25.80.33")
-        target_port = getattr(self.live_collector, "target_port", 8000)
+        target_ip = getattr(self.live_collector, "target_host", "127.0.0.1")
+        target_port = getattr(self.live_collector, "target_port", 80)
 
         # 1. Register Local Host
         self.system_registry.register_node(
             node_id="local-host",
-            name="PRECURSOR Host (172.25.80.31)",
+            name="PRECURSOR Host",
             node_type="server",
-            ip_address="172.25.80.31",
+            ip_address="127.0.0.1",
             status="healthy",
             metrics={"latencyMs": 0.2, "packetLossPct": 0.0},
-            metadata={"role": "Telemetry & Anomaly Intelligence Engine", "firmware": "PRECURSOR v0.1.0-live"},
+            metadata={"role": "Telemetry & Anomaly Intelligence Engine", "firmware": "PRECURSOR v0.1.0-live", "interface": self.interface_id},
             position=[0.0, 0.0, 0.0],
         )
 
         # 2. Register Outbound Probe Target
         tgt_status = "healthy" if (rtt_val is not None and rtt_val < 50.0 and (loss_val is None or loss_val < 5.0)) else "degraded"
-        self.system_registry.register_node(
-            node_id="outbound-target",
-            name=f"Probe Target ({target_ip}:{target_port})",
-            node_type="server",
-            ip_address=target_ip,
-            status=tgt_status,
-            metrics={"latencyMs": rtt_val or 0.9, "packetLossPct": loss_val or 0.0},
-            metadata={"role": "Outbound TCP/Socket Target", "port": target_port, "ipAddress": target_ip},
-            position=[3.5, 1.5, 0.0],
-        )
-        self.system_registry.register_link(
-            source_id="local-host",
-            target_id="outbound-target",
-            status="active" if tgt_status == "healthy" else "degraded",
-            latency_ms=rtt_val,
-            packet_loss_pct=loss_val or 0.0,
-            metadata={"protocol": "TCP/ICMP", "bandwidthGbps": 1.0},
-        )
+        if target_ip and target_ip not in ("127.0.0.1", "localhost"):
+            self.system_registry.register_node(
+                node_id="outbound-target",
+                name=f"Probe Target ({target_ip}:{target_port})",
+                node_type="server",
+                ip_address=target_ip,
+                status=tgt_status,
+                metrics={"latencyMs": rtt_val or 0.9, "packetLossPct": loss_val or 0.0},
+                metadata={"role": "Outbound TCP/Socket Target", "port": target_port, "ipAddress": target_ip},
+                position=[3.5, 1.5, 0.0],
+            )
+            self.system_registry.register_link(
+                source_id="local-host",
+                target_id="outbound-target",
+                status="active" if tgt_status == "healthy" else "degraded",
+                latency_ms=rtt_val,
+                packet_loss_pct=loss_val or 0.0,
+                metadata={"protocol": "TCP/ICMP", "bandwidthGbps": 1.0},
+            )
 
-        # 3. Register Active Inbound Testing Peer (Windows testing workstation)
-        inbound_ip = "172.25.80.33"
-        inbound_mac = "48:9e:bd:74:93:e3"
+        # Update target in SystemProbeManager
+        sys_mgr = getattr(self, "system_manager", None)
+        if sys_mgr and target_ip and target_ip not in ("127.0.0.1", "localhost"):
+            sys_mgr.register_outbound_target(target_ip, target_port, rtt_val)
 
+        # 3. Register Active Inbound Peers (only verified nodes that exchanged packets)
         icmp_rate_pt = next((pt for pt in batch.points if pt.metric_id == "icmp_inbound_rate"), None)
         icmp_rate = float(icmp_rate_pt.value) if icmp_rate_pt and icmp_rate_pt.value is not None else 0.0
 
-        if icmp_rate > 200.0:
-            peer_status = "critical"
-            diag = f"Inbound ICMP flood / spam storm active: {round(icmp_rate, 1)} pkts/sec"
-        elif icmp_rate > 50.0:
-            peer_status = "degraded"
-            diag = f"Elevated inbound ICMP burst / spam: {round(icmp_rate, 1)} pkts/sec"
-        else:
-            peer_status = "healthy"
-            diag = "Inbound ICMP echo peer nominal"
-
-        peer_name = f"Windows Testing Workstation ({inbound_ip})" if inbound_ip == "172.25.80.33" else f"Inbound Peer ({inbound_ip})"
-
-        self.system_registry.register_node(
-            node_id="inbound-peer",
-            name=peer_name,
-            node_type="endpoint",
-            ip_address=inbound_ip,
-            status=peer_status,
-            metrics={"latencyMs": 0.8, "packetLossPct": 0.0, "inboundRate": icmp_rate},
-            metadata={
-                "role": "Inbound ICMP Echo Peer (Ping & Spam Source)",
-                "ipAddress": inbound_ip,
-                "macAddress": inbound_mac,
-                "diagnostic": diag,
-            },
-            position=[-3.5, 1.5, 0.0],
-        )
-        self.system_registry.register_link(
-            source_id="inbound-peer",
-            target_id="local-host",
-            status="active" if peer_status != "critical" else "degraded",
-            latency_ms=0.8,
-            packet_loss_pct=0.0,
-            metadata={"protocol": "ICMP", "bandwidthGbps": 1.0, "inboundRate": icmp_rate},
-        )
+        if sys_mgr:
+            with sys_mgr.lock:
+                inbound_nodes = [
+                    s for s in sys_mgr.systems.values()
+                    if getattr(s, "is_inbound", False) and getattr(s, "packets_received", 0) > 0
+                ]
+                for node in inbound_nodes:
+                    peer_status = "critical" if icmp_rate > 200.0 else ("degraded" if icmp_rate > 50.0 else "healthy")
+                    diag = f"Active traffic: {round(icmp_rate, 1)} pkts/sec" if icmp_rate > 0 else "Nominal inbound peer"
+                    self.system_registry.register_node(
+                        node_id=node.id,
+                        name=node.name,
+                        node_type="endpoint",
+                        ip_address=node.address,
+                        status=peer_status,
+                        metrics={"latencyMs": 0.8, "packetLossPct": 0.0, "inboundRate": icmp_rate},
+                        metadata={
+                            "role": node.role,
+                            "ipAddress": node.address,
+                            "macAddress": getattr(node, "mac_address", None),
+                            "diagnostic": diag,
+                        },
+                        position=[-3.5, 1.5, 0.0],
+                    )
+                    self.system_registry.register_link(
+                        source_id=node.id,
+                        target_id="local-host",
+                        status="active" if peer_status != "critical" else "degraded",
+                        latency_ms=0.8,
+                        packet_loss_pct=0.0,
+                        metadata={"protocol": "ICMP/IP", "bandwidthGbps": 1.0, "inboundRate": icmp_rate},
+                    )
 
         return self._evaluate_pipeline(batch.timestamp)
 

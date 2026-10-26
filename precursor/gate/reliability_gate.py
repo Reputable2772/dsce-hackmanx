@@ -38,7 +38,15 @@ class ReliabilityGate:
         target_metrics: Optional[List[str]] = None,
     ) -> GateDecision:
         if target_metrics is None:
-            target_metrics = ["latency_ms", "packet_loss_pct", "jitter_ms", "throughput_mbps"]
+            target_metrics = [
+                "latency_ms",
+                "packet_loss_pct",
+                "jitter_ms",
+                "throughput_mbps",
+                "packets_in_sec",
+                "icmp_inbound_rate",
+                "drops_in",
+            ]
 
         reasons: List[str] = []
         suppressed_metrics: List[str] = []
@@ -61,11 +69,11 @@ class ReliabilityGate:
                 f"Sensor degradation warning: {round(unhealthy_ratio * 100, 1)}% degraded observations"
             )
 
-        # 2. Distribution Shift / Drift Assessment (KS test on latency_ms and throughput_mbps)
+        # 2. Distribution Shift / Drift Assessment (KS test on latency, throughput, and incoming packet rates)
         max_ks_stat = 0.0
         drift_detected = False
 
-        for metric in ["latency_ms", "throughput_mbps"]:
+        for metric in ["latency_ms", "throughput_mbps", "packets_in_sec", "icmp_inbound_rate"]:
             t_base_start = max(0.0, current_time - 3600.0)
             t_base_end = t_base_start + self.baseline_duration_seconds
             _, base_vals, _ = buffer.get_series(metric, t_base_start, t_base_end)
@@ -88,12 +96,12 @@ class ReliabilityGate:
                         f"Distribution drift on {metric}: KS-statistic={round(stat, 3)} (p={round(p_val, 4)})"
                     )
 
-        # 3. Forecast Residual Drift Assessment
+        # 3. Forecast Residual / Variance Expansion Drift Assessment
         residual_score = 0.0
         _, lat_vals, _ = buffer.get_series("latency_ms", current_time - self.lookback_seconds, current_time)
         clean_lat = lat_vals[~np.isnan(lat_vals)]
         if len(clean_lat) >= 15:
-            # Check variance expansion
+            # Check variance expansion on latency
             early_var = np.var(clean_lat[: len(clean_lat) // 2])
             late_var = np.var(clean_lat[len(clean_lat) // 2 :])
             if early_var > 1e-3:
@@ -101,6 +109,18 @@ class ReliabilityGate:
                 residual_score = round(expansion, 2)
                 if expansion > self.residual_expansion_threshold:
                     reasons.append(f"Residual variance expansion: {expansion:.1f}x baseline noise")
+
+        # Inbound traffic burst variance check
+        _, in_vals, _ = buffer.get_series("packets_in_sec", current_time - self.lookback_seconds, current_time)
+        clean_in = in_vals[~np.isnan(in_vals)]
+        if len(clean_in) >= 15:
+            early_var_in = np.var(clean_in[: len(clean_in) // 2])
+            late_var_in = np.var(clean_in[len(clean_in) // 2 :])
+            if early_var_in > 50.0:
+                expansion_in = float(late_var_in / early_var_in)
+                if expansion_in > self.residual_expansion_threshold:
+                    reasons.append(f"Inbound packet rate variance surge: {expansion_in:.1f}x baseline")
+                    residual_score = max(residual_score, round(expansion_in, 2))
 
         # 4. Synthesize Gate State
         if hard_sensor_failure:
