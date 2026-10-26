@@ -1,6 +1,5 @@
 """Exponentially Weighted Moving Average (EWMA) Detector with dynamic variance bands."""
 
-from typing import Dict, Any, Optional
 import numpy as np
 
 from precursor.detectors.base import BaseDetector, DetectorResult

@@ -9,10 +9,10 @@ from .registry import DetectorRegistry
 
 __all__ = [
     "BaseDetector",
+    "DetectorRegistry",
     "DetectorResult",
-    "FixedSLADetector",
     "EWMADetector",
+    "FixedSLADetector",
     "ForecastResidualDetector",
     "ImmediateFaultDetector",
-    "DetectorRegistry",
 ]

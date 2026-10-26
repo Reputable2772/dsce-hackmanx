@@ -1,7 +1,7 @@
 """KPI metric cards component for the top fold of the dashboard."""
 
 import streamlit as st
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 
 def render_kpi_cards(latest_metrics: Dict[str, Any], link_up: bool = True) -> None:

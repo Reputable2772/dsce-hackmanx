@@ -1,7 +1,7 @@
 """Base detector interface and result definitions for PRECURSOR."""
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from pydantic import BaseModel, Field
 
 from precursor.telemetry.buffer import TelemetryBuffer

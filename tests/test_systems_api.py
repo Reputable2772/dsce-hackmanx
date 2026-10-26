@@ -35,7 +35,7 @@ def systems_api_server(tmp_path_factory):
     server.server_close()
 
 
-def _request(url: str, method: str = "GET", data: dict = None):
+def _request(url: str, method: str = "GET", data: dict | None = None):
     payload = json.dumps(data).encode("utf-8") if data is not None else None
     headers = {"Content-Type": "application/json"} if data is not None else {}
     req = urllib.request.Request(url, data=payload, headers=headers, method=method)
@@ -167,5 +167,5 @@ def test_delete_peer(systems_api_server):
     assert deleted["status"] == "deleted"
 
     # Confirm not in list
-    status, single = _request(f"{url}/api/systems/{peer_id}")
+    status, _ = _request(f"{url}/api/systems/{peer_id}")
     assert status == 404

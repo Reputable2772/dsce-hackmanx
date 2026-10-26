@@ -1,7 +1,6 @@
 """Comprehensive test suite for PRECURSOR non-UI engine."""
 
 import pytest
-import numpy as np
 
 from precursor.telemetry.schema import TelemetryPoint, MetricQuality
 from precursor.telemetry.buffer import TelemetryBuffer
@@ -11,17 +10,12 @@ from precursor.telemetry.synthetic import (
     ScenarioType,
 )
 from precursor.detectors.fixed_sla import FixedSLADetector
-from precursor.detectors.ewma import EWMADetector
-from precursor.detectors.forecast_residual import ForecastResidualDetector
 from precursor.detectors.immediate import ImmediateFaultDetector
-from precursor.detectors.registry import DetectorRegistry
 from precursor.gate.states import GateState
 from precursor.gate.reliability_gate import ReliabilityGate
-from precursor.incidents.schema import Incident, IncidentSeverity
+from precursor.incidents.schema import IncidentSeverity
 from precursor.incidents.grouper import IncidentGrouper
-from precursor.copilot.runbook_matcher import RunbookMatcher
 from precursor.copilot.claim_verifier import NumericalClaimVerifier, ClaimStatus
-from precursor.copilot.llm_client import OllamaCopilot
 from precursor.evaluation.benchmark import PairedBenchmarkRunner
 
 

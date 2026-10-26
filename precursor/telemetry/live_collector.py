@@ -1,10 +1,9 @@
 """Live telemetry collector for Linux active probes and network interface metrics."""
 
 import os
-import sys
 import time
 import socket
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from precursor.telemetry.schema import TelemetryPoint, MetricQuality, MetricBatch
 
 

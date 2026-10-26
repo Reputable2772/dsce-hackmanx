@@ -1,6 +1,5 @@
 """Automated tests for PRECURSOR Phase 3 (Database-Backed History) and Phase 4 (Incidents & Copilot)."""
 
-import os
 import json
 import time
 import threading
@@ -113,7 +112,7 @@ def test_operational_notifications(test_engine):
     assert not any(e["id"] == event_id for e in unread_events)
 
 
-def _http_req(url: str, method: str = "GET", data: dict = None):
+def _http_req(url: str, method: str = "GET", data: dict | None = None):
     payload = json.dumps(data).encode("utf-8") if data is not None else None
     headers = {"Content-Type": "application/json"} if data is not None else {}
     req = urllib.request.Request(url, data=payload, headers=headers, method=method)

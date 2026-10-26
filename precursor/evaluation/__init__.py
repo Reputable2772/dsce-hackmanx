@@ -5,6 +5,6 @@ from .benchmark import PairedBenchmarkRunner
 
 __all__ = [
     "HorizonEvaluationMetrics",
-    "ScenarioComparisonResult",
     "PairedBenchmarkRunner",
+    "ScenarioComparisonResult",
 ]

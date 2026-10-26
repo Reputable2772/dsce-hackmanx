@@ -1,7 +1,7 @@
 """Evaluation metrics and results data models for PRECURSOR."""
 
-from typing import Dict, List, Any, Optional
-from pydantic import BaseModel, Field
+from typing import Dict
+from pydantic import BaseModel
 
 
 class HorizonEvaluationMetrics(BaseModel):

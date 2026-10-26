@@ -6,11 +6,10 @@ Implements the PRECURSOR target API contract with full versioning (/api and /api
 """
 
 import os
-import sys
 import json
 import time
 import urllib.parse
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 import threading
@@ -18,7 +17,6 @@ import threading
 from precursor.runner import PrecursorEngine, SystemSnapshot
 from precursor.telemetry.schema import TelemetryPoint
 from precursor.telemetry.synthetic import ScenarioType
-from precursor.gate.states import GateState
 from precursor.systems.manager import SystemProbeManager
 
 
@@ -358,6 +356,20 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
         norm_path = self._normalize_path(path)
         query = urllib.parse.parse_qs(parsed.query)
 
+        # Auto-discover and register incoming system / client
+        client_ip = self.client_address[0] if self.client_address else "127.0.0.1"
+        user_agent = self.headers.get("User-Agent", "")
+        system_id = self.headers.get("X-System-ID") or self.headers.get("X-Node-ID")
+        try:
+            self.engine.system_registry.register_access(
+                ip_address=client_ip,
+                user_agent=user_agent,
+                endpoint=self.path,
+                system_id=system_id,
+            )
+        except Exception:
+            pass
+
         if norm_path in ("", "/health", "/api/health"):
             self._send_json(200, {
                 "status": "ok",
@@ -390,11 +402,19 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
             self._send_json(200, self._openapi_spec())
             return
 
-        if norm_path == "/api/systems":
+        if norm_path in ("/api/systems", "/api/systems/discovered"):
             mgr = self.get_system_manager()
+            sys_list = mgr.list_systems()
+            reg_ids = {s.get("id") for s in sys_list}
+            if hasattr(self.engine, "system_registry"):
+                for s in self.engine.system_registry.get_systems():
+                    if s.get("id") not in reg_ids:
+                        sys_list.append(s)
+                        reg_ids.add(s.get("id"))
             self._send_json(200, {
-                "systems": mgr.list_systems(),
-                "count": len(mgr.systems),
+                "systems": sys_list,
+                "count": len(sys_list),
+                "total": len(sys_list),
                 "timestamp": time.time(),
             })
             return
@@ -534,18 +554,56 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
                     "predicted_events": [i for i in serialized if not i.get("is_active_fault")],
                 })
 
+            elif norm_path in ("/api/incidents/history", "/api/v1/incidents/history"):
+                source_filter = query.get("source", ["all"])[0]
+                severity_filter = query.get("severity", ["all"])[0]
+                node_filter = query.get("node_id", ["all"])[0]
+                limit = int(query.get("limit", [50])[0])
+                offset = int(query.get("offset", [0])[0])
+                result = self.engine.incident_db.list_incidents(
+                    source=source_filter,
+                    severity=severity_filter,
+                    node_id=node_filter,
+                    limit=limit,
+                    offset=offset,
+                )
+                self._send_json(200, result)
+
+            elif norm_path.startswith("/api/incidents/") and "/packets" in norm_path:
+                suffix = norm_path.replace("/api/incidents/", "").strip()
+                inc_id = suffix.replace("/packets", "").strip()
+                limit = int(query.get("limit", [100])[0])
+                packets = self.engine.incident_db.get_incident_packets(inc_id, limit=limit)
+                self._send_json(200, {
+                    "incident_id": inc_id,
+                    "count": len(packets),
+                    "packets": packets,
+                })
+
             elif norm_path.startswith("/api/incidents/"):
                 inc_id = norm_path.replace("/api/incidents/", "").strip()
                 match = next((i for i in snapshot.incidents if i.id == inc_id), None)
-                if not match and hasattr(self.engine, "db"):
+                if match:
+                    res = match.model_dump()
+                    if hasattr(self.engine, "incident_states") and inc_id in self.engine.incident_states:
+                        res["status"] = self.engine.incident_states[inc_id]
+                    self._send_json(200, res)
+                    return
+                if hasattr(self.engine, "incident_db"):
+                    rec = self.engine.incident_db.get_incident(inc_id)
+                    if rec:
+                        if hasattr(self.engine, "incident_states") and inc_id in self.engine.incident_states:
+                            rec["status"] = self.engine.incident_states[inc_id]
+                        self._send_json(200, rec)
+                        return
+                if hasattr(self.engine, "db"):
                     db_row = self.engine.db.get_incident(inc_id)
                     if db_row:
+                        if hasattr(self.engine, "incident_states") and inc_id in self.engine.incident_states:
+                            db_row["status"] = self.engine.incident_states[inc_id]
                         self._send_json(200, db_row)
                         return
-                if match:
-                    self._send_json(200, match.model_dump())
-                else:
-                    self._send_json(404, {"error": "Incident not found", "incident_id": inc_id})
+                self._send_json(404, {"error": "Incident not found", "incident_id": inc_id})
 
             elif norm_path == "/api/history/summary":
                 summary = self.engine.db.get_history_summary()
@@ -753,6 +811,10 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
                 else:
                     self._send_json(404, {"error": "Run archive not found", "run_id": run_id})
 
+            elif norm_path in ("/api/topology/systems",):
+                graph = self.engine.system_registry.get_topology_graph()
+                self._send_json(200, graph)
+
             elif norm_path in ("/api/runbooks", "/api/v1/runbooks"):
                 from precursor.copilot.runbook_matcher import RunbookMatcher
                 matcher = RunbookMatcher()
@@ -807,6 +869,20 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
         path = parsed.path.rstrip("/")
         norm_path = self._normalize_path(path)
         body = self._read_json_body()
+
+        # Auto-discover and register incoming system / client
+        client_ip = self.client_address[0] if self.client_address else "127.0.0.1"
+        user_agent = self.headers.get("User-Agent", "")
+        system_id = self.headers.get("X-System-ID") or self.headers.get("X-Node-ID")
+        try:
+            self.engine.system_registry.register_access(
+                ip_address=client_ip,
+                user_agent=user_agent,
+                endpoint=self.path,
+                system_id=system_id,
+            )
+        except Exception:
+            pass
 
         if norm_path == "/api/systems":
             mgr = self.get_system_manager()
@@ -897,7 +973,11 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
                 ingested = []
                 for p in raw_points:
                     try:
-                        ingested.append(TelemetryPoint(**p))
+                        if isinstance(p, dict):
+                            p_copy = dict(p)
+                            if "quality" in p_copy and isinstance(p_copy["quality"], str):
+                                p_copy["quality"] = p_copy["quality"].lower()
+                            ingested.append(TelemetryPoint(**p_copy))
                     except Exception:
                         pass
                 if ingested:
@@ -1089,6 +1169,31 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
                     "csv_path": paths.get("csv_path"),
                 })
 
+            elif path.startswith("/api/incidents/") and path.endswith("/status"):
+                inc_id = path.replace("/api/incidents/", "").replace("/status", "").strip()
+                new_status = body.get("status", "INVESTIGATING")
+                updated = False
+                if hasattr(self.engine, "incident_db"):
+                    updated = self.engine.incident_db.update_status(inc_id, new_status) or updated
+                if hasattr(self.engine, "db"):
+                    updated = self.engine.db.update_incident_status(inc_id, new_status) or updated
+                if self.engine.last_snapshot:
+                    for inc in self.engine.last_snapshot.incidents:
+                        if inc.id == inc_id:
+                            inc.status = new_status
+                            updated = True
+                if updated:
+                    if not hasattr(self.engine, "incident_states"):
+                        self.engine.incident_states = {}
+                    self.engine.incident_states[inc_id] = new_status
+                    self._send_json(200, {
+                        "status": "updated",
+                        "incident_id": inc_id,
+                        "new_status": new_status,
+                    })
+                else:
+                    self._send_json(404, {"error": "Incident not found", "id": inc_id})
+
             else:
                 self._send_json(404, {"error": "Endpoint not found", "path": path})
 
@@ -1120,14 +1225,14 @@ def run_server():
     """CLI entrypoint for running the REST API server."""
     host = os.environ.get("PRECURSOR_HOST", "0.0.0.0")
     port = int(os.environ.get("PRECURSOR_PORT", "8000"))
-    print(f"============================================================")
-    print(f"  PRECURSOR REST API Service (CORS enabled)")
+    print("============================================================")
+    print("  PRECURSOR REST API Service (CORS enabled)")
     print(f"  Listening on http://{host}:{port}")
-    print(f"  Endpoints: /health, /ready, /docs, /api/status, /api/topology,")
-    print(f"             /api/telemetry, /api/gate, /api/predictions,")
-    print(f"             /api/incidents, /api/simulation, /api/evaluation,")
-    print(f"             /api/copilot/query, /api/claims/verify, /api/config")
-    print(f"============================================================")
+    print("  Endpoints: /health, /ready, /docs, /api/status, /api/topology,")
+    print("             /api/telemetry, /api/gate, /api/predictions,")
+    print("             /api/incidents, /api/simulation, /api/evaluation,")
+    print("             /api/copilot/query, /api/claims/verify, /api/config")
+    print("============================================================")
     server = create_server(host=host, port=port)
     try:
         server.serve_forever()

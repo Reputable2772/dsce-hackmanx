@@ -1,9 +1,9 @@
 """Deterministic synthetic telemetry generator with 8 failure & degradation scenarios."""
 
 from enum import Enum
-from typing import Dict, List, Optional, Any, Tuple
+from typing import List, Optional
 import numpy as np
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from precursor.telemetry.schema import TelemetryPoint, MetricQuality, MetricBatch
 

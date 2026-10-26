@@ -1,6 +1,5 @@
 """Fixed SLA Threshold Detector with sustained breach and horizon trend projection."""
 
-from typing import Dict, Any, Optional
 import numpy as np
 
 from precursor.detectors.base import BaseDetector, DetectorResult
