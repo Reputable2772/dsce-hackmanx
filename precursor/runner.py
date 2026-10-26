@@ -177,7 +177,81 @@ class PrecursorEngine:
         batch = self.live_collector.collect()
         self.buffer.add_batch(batch.points)
         self.db.record_telemetry_batch(batch.points, source=self.mode)
+
+        # Dynamic live peer registration for 3D topology
+        rtt_val = None
+        loss_val = None
+        for pt in batch.points:
+            if pt.metric_id == "latency_ms":
+                rtt_val = pt.value
+            elif pt.metric_id == "packet_loss_pct":
+                loss_val = pt.value
+
+        target_ip = getattr(self.live_collector, "target_host", "172.25.80.33")
+        target_port = getattr(self.live_collector, "target_port", 8000)
+
+        # 1. Register Local Host
+        self.system_registry.register_node(
+            node_id="local-host",
+            name="PRECURSOR Host (172.25.80.31)",
+            node_type="server",
+            ip_address="172.25.80.31",
+            status="healthy",
+            metrics={"latencyMs": 0.2, "packetLossPct": 0.0},
+            metadata={"role": "Telemetry & Anomaly Intelligence Engine", "firmware": "PRECURSOR v0.1.0-live"},
+            position=[0.0, 0.0, 0.0],
+        )
+
+        # 2. Register Outbound Probe Target
+        tgt_status = "healthy" if (rtt_val is not None and rtt_val < 50.0 and (loss_val is None or loss_val < 5.0)) else "degraded"
+        self.system_registry.register_node(
+            node_id="outbound-target",
+            name=f"Probe Target ({target_ip}:{target_port})",
+            node_type="server",
+            ip_address=target_ip,
+            status=tgt_status,
+            metrics={"latencyMs": rtt_val or 0.9, "packetLossPct": loss_val or 0.0},
+            metadata={"role": "Outbound TCP/Socket Target", "port": target_port, "ipAddress": target_ip},
+            position=[3.5, 1.5, 0.0],
+        )
+        self.system_registry.register_link(
+            source_id="local-host",
+            target_id="outbound-target",
+            status="active" if tgt_status == "healthy" else "degraded",
+            latency_ms=rtt_val,
+            packet_loss_pct=loss_val or 0.0,
+            metadata={"protocol": "TCP/ICMP", "bandwidthGbps": 1.0},
+        )
+
+        # 3. Discover and register Inbound Peers from ARP
+        arp_peers = self.live_collector.read_arp_peers()
+        inbound_ip = "172.25.80.33"
+        for p in arp_peers:
+            if p["ip"] not in ("172.25.80.1", "127.0.0.1", "172.25.80.31"):
+                inbound_ip = p["ip"]
+                break
+
+        self.system_registry.register_node(
+            node_id="inbound-peer",
+            name=f"Inbound Peer ({inbound_ip})",
+            node_type="endpoint",
+            ip_address=inbound_ip,
+            status="healthy",
+            metrics={"latencyMs": 0.8, "packetLossPct": 0.0},
+            metadata={"role": "Inbound ICMP Echo Peer", "ipAddress": inbound_ip},
+            position=[-3.5, 1.5, 0.0],
+        )
+        self.system_registry.register_link(
+            source_id="inbound-peer",
+            target_id="local-host",
+            status="active",
+            latency_ms=0.8,
+            packet_loss_pct=0.0,
+            metadata={"protocol": "ICMP", "bandwidthGbps": 1.0},
+        )
+
         return self._evaluate_pipeline(batch.timestamp)
+
 
     def reset_scenario(self, scenario_type: ScenarioType, seed: int = 42):
         """Switch to a new synthetic scenario and reset the internal buffer."""
@@ -386,6 +460,20 @@ class PrecursorEngine:
                     inc_obj = Incident(**db_inc)
                 except Exception:
                     pass
+        if not inc_obj:
+            from precursor.gate.states import GateState
+            from precursor.incidents.schema import IncidentSeverity
+            inc_obj = Incident(
+                id=incident_id,
+                title=f"Live Network Anomaly & SLA Breach ({incident_id})",
+                is_active_fault=True,
+                gate_state=GateState.DEGRADED,
+                severity=IncidentSeverity.CRITICAL,
+                detected_at=time.time(),
+                interface_id=getattr(self, "interface_id", "eth0"),
+                source=getattr(self, "mode", "live"),
+                status="ACTIVE",
+            )
 
         telemetry = self.last_snapshot.latest_telemetry if self.last_snapshot else {}
         matches = self.matcher.match(inc_obj, top_k=2) if inc_obj else []

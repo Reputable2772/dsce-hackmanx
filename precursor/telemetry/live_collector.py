@@ -284,3 +284,26 @@ class LiveTelemetryCollector:
             ),
         ]
         return MetricBatch(timestamp=now, source="live", points=points)
+
+    def read_arp_peers(self) -> list:
+        """Read active neighbors / ARP table from /proc/net/arp on Linux."""
+        peers = []
+        proc_arp = "/proc/net/arp"
+        if os.path.exists(proc_arp):
+            try:
+                with open(proc_arp, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+                for line in lines[1:]:
+                    parts = line.strip().split()
+                    if len(parts) >= 6:
+                        ip = parts[0]
+                        flags = parts[2]
+                        mac = parts[3]
+                        device = parts[5]
+                        # Flags 0x2 indicates complete entry (valid hardware address)
+                        if flags == "0x2" and mac != "00:00:00:00:00:00":
+                            peers.append({"ip": ip, "mac": mac, "device": device})
+            except Exception:
+                pass
+        return peers
+

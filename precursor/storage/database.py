@@ -143,6 +143,8 @@ class DatabaseManager:
                 )
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_events_ts ON operational_events(timestamp DESC)")
+            conn.execute("UPDATE operational_events SET severity = REPLACE(severity, 'IncidentSeverity.', '') WHERE severity LIKE 'IncidentSeverity.%'")
+            conn.execute("UPDATE incidents SET severity = REPLACE(severity, 'IncidentSeverity.', '') WHERE severity LIKE 'IncidentSeverity.%'")
             conn.commit()
 
     # --- Telemetry History ---
@@ -201,6 +203,14 @@ class DatabaseManager:
         inc_id = inc_data["id"]
         now = inc_data.get("detected_at", time.time())
 
+        raw_sev = inc_data.get("severity", "WARNING")
+        sev = getattr(raw_sev, "value", str(raw_sev)).replace("IncidentSeverity.", "").upper()
+        if sev not in ("CRITICAL", "WARNING", "INFO"):
+            sev = "WARNING"
+
+        gate_st = inc_data.get("gate_state", "PREDICT")
+        gate_st_str = getattr(gate_st, "value", str(gate_st)).replace("GateState.", "").upper()
+
         with self._get_connection() as conn:
             existing = conn.execute("SELECT id, first_seen, status FROM incidents WHERE id = ?", (inc_id,)).fetchone()
             if existing:
@@ -219,8 +229,8 @@ class DatabaseManager:
                 """, (
                     now,
                     json.dumps(inc_data.get("evidence_summary", {})),
-                    str(inc_data.get("gate_state", "PREDICT")),
-                    str(inc_data.get("severity", "WARNING")),
+                    gate_st_str,
+                    sev,
                     status,
                     resolved_at,
                     inc_id,
@@ -242,8 +252,8 @@ class DatabaseManager:
                     inc_data.get("predicted_horizon_minutes"),
                     json.dumps(inc_data.get("primary_metrics", [])),
                     json.dumps(inc_data.get("supporting_signals", [])),
-                    str(inc_data.get("gate_state", "PREDICT")),
-                    str(inc_data.get("severity", "WARNING")),
+                    gate_st_str,
+                    sev,
                     now,
                     first_seen,
                     now,
@@ -257,7 +267,6 @@ class DatabaseManager:
                 ))
 
                 # Add a notification event for new warning/critical incident
-                sev = str(inc_data.get("severity", "WARNING"))
                 conn.execute("""
                     INSERT INTO operational_events (timestamp, event_type, title, message, severity, related_incident_id)
                     VALUES (?, ?, ?, ?, ?, ?)

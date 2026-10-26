@@ -356,10 +356,11 @@ class SystemRegistry:
             rows = cur.fetchall()
             return [dict(r) for r in rows]
 
-    def get_topology_graph(self) -> Dict[str, Any]:
+    def get_topology_graph(self, mode: Optional[str] = None) -> Dict[str, Any]:
         """
         Return complete topology graph matching NetworkTopologyData interface in frontend:
         { id, name, description, isDemoFixture: false, nodes: [...], links: [...] }
+        When mode == 'live', filters out synthetic datacenter nodes.
         """
         with self._get_connection() as conn:
             cur = conn.cursor()
@@ -371,6 +372,16 @@ class SystemRegistry:
 
             nodes = []
             for r in node_rows:
+                n_id = r["id"]
+                if mode == "live" and (
+                    n_id.startswith(("sw-", "rtr-", "gw-", "leaf-", "spine-"))
+                    or "fixture" in n_id
+                    or "Spine" in r["name"]
+                    or "Leaf" in r["name"]
+                    or "Gateway" in r["name"]
+                ):
+                    continue
+
                 nodes.append({
                     "id": r["id"],
                     "name": r["name"],
@@ -381,8 +392,11 @@ class SystemRegistry:
                     "metadata": json.loads(r["metadata_json"]),
                 })
 
+            valid_node_ids = {n["id"] for n in nodes}
             links = []
             for r in link_rows:
+                if mode == "live" and (r["source_id"] not in valid_node_ids or r["target_id"] not in valid_node_ids):
+                    continue
                 links.append({
                     "id": r["id"],
                     "sourceId": r["source_id"],
@@ -396,9 +410,10 @@ class SystemRegistry:
 
             return {
                 "id": "topology-dynamic-live",
-                "name": "Live Network Dynamic Topology",
+                "name": "Live Network Dynamic Topology" if mode == "live" else "Dynamic Network Topology",
                 "description": f"Real-time graph tracking {len(nodes)} active systems and {len(links)} connections.",
                 "isDemoFixture": False,
                 "nodes": nodes,
                 "links": links,
             }
+

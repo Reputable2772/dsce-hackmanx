@@ -358,6 +358,49 @@ export const IncidentDetailPanel: React.FC<IncidentDetailPanelProps> = ({
       {/* TAB 1: OVERVIEW */}
       {activeTab === 'overview' && (
         <div className="space-y-4">
+          {/* AI Root-Cause Summary & Runbook Steps */}
+          <div className="rounded-xl border border-indigo-200 bg-[#EEF2FF]/60 p-4 space-y-3">
+            <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+              <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-[#202938]">
+                <Sparkles className="h-4 w-4 text-[#5267D8]" />
+                <span>AI Root-Cause Summary & Operational Runbook</span>
+              </div>
+              <button
+                onClick={() => setActiveTab('copilot')}
+                className="text-[11px] font-semibold text-[#5267D8] hover:underline"
+              >
+                View Full Runbook &rarr;
+              </button>
+            </div>
+            <p className="text-xs text-[#334155] leading-relaxed">
+              {incident.summary || 'Anomalous deviation detected across monitored telemetry signals.'}
+            </p>
+            {diagnosticSteps.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[10px] uppercase font-bold text-[#5267D8] tracking-wider block font-mono">
+                  Recommended Diagnostic Commands (Click to Copy):
+                </span>
+                <div className="grid grid-cols-1 gap-1.5">
+                  {diagnosticSteps.slice(0, 3).map((st) => (
+                    <div
+                      key={st.step}
+                      className="flex items-center justify-between gap-2 rounded-lg bg-[#1E293B] px-3 py-1.5 font-mono text-xs text-emerald-400"
+                    >
+                      <code className="truncate">{st.command}</code>
+                      <button
+                        onClick={() => handleCopy(st.command || "")}
+                        className="text-slate-400 hover:text-white transition shrink-0 ml-2"
+                        title="Copy command"
+                      >
+                        {copiedCmd === st.command ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Observed Evidence vs Baselines */}
           <div>
             <div className="flex items-center justify-between">

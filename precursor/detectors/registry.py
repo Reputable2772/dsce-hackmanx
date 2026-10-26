@@ -17,10 +17,10 @@ class DetectorRegistry:
         self._init_default_detectors()
 
     def _init_default_detectors(self):
-        # 1. Fixed SLA Detectors
-        self.detectors.append(FixedSLADetector(metric_id="latency_ms", threshold=80.0, sustained_samples=3))
-        self.detectors.append(FixedSLADetector(metric_id="packet_loss_pct", threshold=5.0, sustained_samples=3))
-        self.detectors.append(FixedSLADetector(metric_id="jitter_ms", threshold=15.0, sustained_samples=3))
+        # 1. Fixed SLA Detectors (Tuned for LAN and live operational early warning)
+        self.detectors.append(FixedSLADetector(metric_id="latency_ms", threshold=50.0, sustained_samples=2))
+        self.detectors.append(FixedSLADetector(metric_id="packet_loss_pct", threshold=5.0, sustained_samples=2))
+        self.detectors.append(FixedSLADetector(metric_id="jitter_ms", threshold=10.0, sustained_samples=2))
         self.detectors.append(FixedSLADetector(metric_id="drops_in", threshold=20.0, sustained_samples=2))
 
         # 2. EWMA Detectors with adaptive dynamic bands

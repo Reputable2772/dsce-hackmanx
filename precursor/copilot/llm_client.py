@@ -12,6 +12,8 @@ from precursor.copilot.claim_verifier import (
     NumericalClaimVerifier,
     ClaimVerification,
     AssumptionVerification,
+    HypothesisVerification,
+    HypothesisStatus,
 )
 from precursor.copilot.gemini_client import GeminiClient, fire_ollama_prompt_async
 
@@ -25,6 +27,7 @@ class CopilotHypothesisItem(BaseModel):
     id: str = Field(..., description="Hypothesis ID (e.g. H1, H2)")
     statement: str = Field(..., description="Plausible root cause (explicitly designated as hypothesis)")
     confidence: float = Field(0.8, description="Estimated confidence between 0.0 and 1.0")
+    supporting_assumptions: List[str] = Field(default_factory=list, description="IDs of prerequisite operational assumptions (e.g. ['A1', 'A2'])")
     rationale: str = Field("", description="Evidence supporting this hypothesis")
 
 
@@ -61,6 +64,7 @@ class CopilotResponse(BaseModel):
     summary: str = Field(..., description="Telemetry evidence summary")
     hypotheses: List[str] = Field(default_factory=list, description="Possible causes (strings for backward compatibility)")
     structured_hypotheses: List[CopilotHypothesisItem] = Field(default_factory=list, description="Structured hypotheses objects")
+    verified_hypotheses: List[HypothesisVerification] = Field(default_factory=list, description="Independently audited and logically entailed hypotheses")
     assumptions: List[AssumptionVerification] = Field(default_factory=list, description="Independently audited operational assumptions")
     diagnostic_commands: List[str] = Field(default_factory=list, description="Copyable bash diagnostic commands")
     verification_steps: List[str] = Field(default_factory=list, description="Expected observations and verification steps")
@@ -128,8 +132,9 @@ class OllamaCopilot:
         try:
             parsed_strict = CopilotStrictJSON(**json.loads(raw_text))
         except Exception:
+            fallback_title = getattr(incident, "title", None) or "Live Network Breach"
             parsed_strict = CopilotStrictJSON(
-                summary=f"Incident detected on {incident.title}.",
+                summary=f"Incident detected on {fallback_title}.",
                 hypotheses=[
                     CopilotHypothesisItem(
                         id="H1",
@@ -157,16 +162,18 @@ class OllamaCopilot:
 
         assumptions_dict = [a.model_dump() for a in parsed_strict.assumptions]
         assumptions_audited = self.verifier.verify_assumptions(assumptions_dict, telemetry_snapshot)
+        verified_hypotheses = self.verifier.verify_hypotheses(parsed_strict.hypotheses, assumptions_audited)
 
         hypotheses_strings = [
-            f"{h.statement} (confidence: {int(h.confidence * 100)}%)" if h.confidence else h.statement
-            for h in parsed_strict.hypotheses
+            f"{vh.statement} [{vh.status.value}] (confidence: {int(vh.confidence * 100)}%)"
+            for vh in verified_hypotheses
         ]
 
         return CopilotResponse(
             summary=parsed_strict.summary,
             hypotheses=hypotheses_strings,
             structured_hypotheses=parsed_strict.hypotheses,
+            verified_hypotheses=verified_hypotheses,
             assumptions=assumptions_audited,
             diagnostic_commands=parsed_strict.diagnostic_commands,
             verification_steps=parsed_strict.verification_steps,
@@ -216,7 +223,7 @@ MANDATORY INSTRUCTIONS:
 {{
   "summary": "Brief summary citing current telemetry readings",
   "hypotheses": [
-    {{"id": "H1", "statement": "Plausible cause labelled (Hypothesis)", "confidence": 0.85, "rationale": "Evidence from telemetry"}}
+    {{"id": "H1", "statement": "Plausible cause labelled (Hypothesis)", "confidence": 0.85, "supporting_assumptions": ["A1"], "rationale": "Evidence from telemetry"}}
   ],
   "assumptions": [
     {{"id": "A1", "statement": "Physical link state remains active", "metric_id": "link_state", "operator": "==", "expected_value": 1.0}}
@@ -267,10 +274,11 @@ MANDATORY INSTRUCTIONS:
 
         assumptions_dict = [a.model_dump() for a in parsed_strict.assumptions]
         assumptions_audited = self.verifier.verify_assumptions(assumptions_dict, telemetry_snapshot)
+        verified_hypotheses = self.verifier.verify_hypotheses(parsed_strict.hypotheses, assumptions_audited)
 
         hypotheses_strings = [
-            f"{h.statement} (confidence: {int(h.confidence * 100)}%)" if h.confidence else h.statement
-            for h in parsed_strict.hypotheses
+            f"{vh.statement} [{vh.status.value}] (confidence: {int(vh.confidence * 100)}%)"
+            for vh in verified_hypotheses
         ]
 
         # 5. Show response seamlessly as local model per directive
@@ -280,6 +288,7 @@ MANDATORY INSTRUCTIONS:
             summary=parsed_strict.summary,
             hypotheses=hypotheses_strings,
             structured_hypotheses=parsed_strict.hypotheses,
+            verified_hypotheses=verified_hypotheses,
             assumptions=assumptions_audited,
             diagnostic_commands=parsed_strict.diagnostic_commands,
             verification_steps=parsed_strict.verification_steps,
@@ -399,9 +408,25 @@ Current telemetry snapshot:
         claims = self.verifier.verify_response(raw_text, telemetry_snapshot)
         parsed = self._parse_sections(raw_text)
 
+        raw_hyps = parsed.get("hypotheses", ["Potential traffic surge or path convergence (Hypothesis)"])
+        hyp_items = [
+            CopilotHypothesisItem(
+                id=f"H{i+1}",
+                statement=h,
+                confidence=0.8,
+                supporting_assumptions=[],
+                rationale="Operator query analysis",
+            )
+            for i, h in enumerate(raw_hyps)
+        ]
+        verified_hypotheses = self.verifier.verify_hypotheses(hyp_items, [])
+
         return CopilotResponse(
             summary=parsed.get("summary", f"Grounded response for query: {prompt}"),
             hypotheses=parsed.get("hypotheses", ["Potential traffic surge or path convergence (Hypothesis)"]),
+            structured_hypotheses=hyp_items,
+            verified_hypotheses=verified_hypotheses,
+            assumptions=[],
             diagnostic_commands=parsed.get("diagnostic_commands", ["ip -s link", "ping -c 5 1.1.1.1"]),
             verification_steps=parsed.get("verification_steps", ["Verify SLA adherence across 5m, 15m, and 30m"]),
             risks_and_rollback=parsed.get("risks_and_rollback", ["Do not restart interfaces without rollback plan"]),
@@ -507,18 +532,26 @@ Current telemetry snapshot:
                 "id": "H1",
                 "statement": "Interface bufferbloat or upstream bottleneck (Hypothesis)",
                 "confidence": 0.88,
+                "supporting_assumptions": ["A1", "A2"],
                 "rationale": "Sustained latency elevation coinciding with packet queuing",
             },
             {
                 "id": "H2",
                 "statement": "Optical transceiver degradation or physical frame errors (Hypothesis)",
                 "confidence": 0.65,
+                "supporting_assumptions": ["A1"],
                 "rationale": "Intermittent frame drops and jitter instability",
             },
         ]
 
+        inc_id = getattr(incident, "id", None) or "live-network-breach"
+        inc_title = getattr(incident, "title", None) or "Network SLA Degradation / Early Warning"
+        inc_gate = "DEGRADED"
+        if incident and hasattr(incident, "gate_state"):
+            inc_gate = incident.gate_state.value if hasattr(incident.gate_state, "value") else str(incident.gate_state)
+
         data = {
-            "summary": f"Incident {incident.id} detected on eth0 ({incident.title}). Gate state: {incident.gate_state.value}.",
+            "summary": f"Incident {inc_id} detected on physical network ({inc_title}). Gate state: {inc_gate}.",
             "hypotheses": hypotheses,
             "assumptions": assumptions,
             "numerical_claims": claims,

@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any
 
 logger = logging.getLogger("precursor.gemini")
 
-DEFAULT_GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+DEFAULT_GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 
 
 def fire_ollama_prompt_async(base_url: str, model: str, prompt: str) -> None:
@@ -40,6 +40,25 @@ def fire_ollama_prompt_async(base_url: str, model: str, prompt: str) -> None:
     t.start()
 
 
+def _load_dotenv() -> None:
+    """Lightweight .env parser loading key-value pairs into os.environ if not already set."""
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    env_file = os.path.join(base_dir, ".env")
+    if os.path.exists(env_file):
+        try:
+            with open(env_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.strip().strip("'\"")
+                        if k and (k not in os.environ or not os.environ[k].strip()):
+                            os.environ[k] = v
+        except Exception:
+            pass
+
+
 class GeminiClient:
     """
     Direct Google Gemini REST API client.
@@ -53,6 +72,7 @@ class GeminiClient:
         model: str = DEFAULT_GEMINI_MODEL,
         timeout_seconds: float = 8.0,
     ):
+        _load_dotenv()
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
         self.model = model
         self.timeout_seconds = timeout_seconds

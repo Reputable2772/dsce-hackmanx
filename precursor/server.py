@@ -19,6 +19,22 @@ from precursor.telemetry.schema import TelemetryPoint
 from precursor.telemetry.synthetic import ScenarioType
 from precursor.systems.manager import SystemProbeManager
 
+# Load project .env if present
+_env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+if os.path.exists(_env_path):
+    try:
+        with open(_env_path, "r", encoding="utf-8") as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _k, _v = _line.split("=", 1)
+                    _k = _k.strip()
+                    _v = _v.strip().strip("'\"")
+                    if _k and (_k not in os.environ or not os.environ[_k].strip()):
+                        os.environ[_k] = _v
+    except Exception:
+        pass
+
 
 def resolve_scenario_type(name: Any, fallback: ScenarioType = ScenarioType.GRADUAL_DEGRADATION) -> ScenarioType:
     """Deterministically resolve scenario name or alias to ScenarioType."""
@@ -133,7 +149,7 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
     def _build_topology(self, snapshot: SystemSnapshot) -> Dict[str, Any]:
         """Generate dynamic topology representing Spine-Leaf fabric annotated with real backend telemetry."""
         if getattr(self.engine, "mode", "synthetic") == "live":
-            return self.engine.system_registry.get_topology_graph()
+            return self.engine.system_registry.get_topology_graph(mode="live")
 
         latest = snapshot.latest_telemetry or {}
         rtt = float(latest.get("latency_ms") or 18.2)
@@ -1260,12 +1276,33 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
         pass
 
 
+_live_stream_thread: Optional[threading.Thread] = None
+_live_stream_running = True
+
+
+def _live_stream_worker():
+    """Background streaming thread that continuously samples live network telemetry when in live mode."""
+    while _live_stream_running:
+        try:
+            handler = PrecursorApiHandler
+            if handler.engine and getattr(handler.engine, "mode", None) == "live":
+                if handler.engine_lock:
+                    with handler.engine_lock:
+                        handler.engine.step_live()
+                else:
+                    handler.engine.step_live()
+        except Exception:
+            pass
+        time.sleep(3.0)
+
+
 def create_server(
     host: str = "0.0.0.0",
     port: int = 8000,
     engine: Optional[PrecursorEngine] = None,
 ) -> ThreadedHTTPServer:
     """Instantiate and configure the PRECURSOR threaded HTTP server."""
+    global _live_stream_thread
     if engine is None:
         engine = PrecursorEngine(scenario_type=ScenarioType.GRADUAL_DEGRADATION, seed=42)
         # Pre-seed nominal 25 steps (125s) for baseline instantly
@@ -1275,6 +1312,11 @@ def create_server(
     PrecursorApiHandler.engine_lock = threading.Lock()
     if PrecursorApiHandler.system_manager is None:
         PrecursorApiHandler.system_manager = SystemProbeManager()
+
+    if _live_stream_thread is None or not _live_stream_thread.is_alive():
+        _live_stream_thread = threading.Thread(target=_live_stream_worker, daemon=True, name="precursor-live-streamer")
+        _live_stream_thread.start()
+
     server = ThreadedHTTPServer((host, port), PrecursorApiHandler)
     return server
 

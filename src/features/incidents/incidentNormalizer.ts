@@ -137,6 +137,7 @@ export function normalizeIncident(raw: any, index: number = 0): IncidentRecord {
   );
 
   const summary = String(
+    raw.copilot_summary ||
     raw.summary ||
       raw.description ||
       (isActiveFault
@@ -185,6 +186,14 @@ export function normalizeIncident(raw: any, index: number = 0): IncidentRecord {
   // 10. Hypotheses
   const hypotheses = Array.isArray(raw.hypotheses)
     ? raw.hypotheses
+    : Array.isArray(raw.copilot_hypotheses) && raw.copilot_hypotheses.length > 0
+    ? raw.copilot_hypotheses.map((h: any, idx: number) => ({
+        id: `hyp-${id}-${idx + 1}`,
+        title: h.statement || String(h),
+        likelihood: h.confidence && h.confidence > 0.7 ? ('High' as const) : ('Medium' as const),
+        rationale: h.rationale || `Grounded in observed telemetry evidence.`,
+        isHypothesis: true as const,
+      }))
     : [
         {
           id: `hyp-${id}-1`,
@@ -195,17 +204,39 @@ export function normalizeIncident(raw: any, index: number = 0): IncidentRecord {
         },
       ];
 
-  // 11. Diagnostic steps
-  const diagnosticSteps = Array.isArray(raw.diagnosticSteps)
-    ? raw.diagnosticSteps
-    : [
-        {
-          step: 1,
-          action: `Verify interface counters and link status on ${iface}`,
-          command: `ip -s link show ${iface}`,
-          expected: 'Confirm drop counters and link operational carrier state',
-        },
-      ];
+  // 11. Diagnostic steps & Runbook commands
+  let diagnosticSteps: any[] = [];
+  if (Array.isArray(raw.diagnosticSteps) && raw.diagnosticSteps.length > 0) {
+    diagnosticSteps = raw.diagnosticSteps;
+  } else if (Array.isArray(raw.diagnostic_commands) && raw.diagnostic_commands.length > 0) {
+    diagnosticSteps = raw.diagnostic_commands.map((cmd: string, idx: number) => ({
+      step: idx + 1,
+      action: `Diagnostic runbook probe step`,
+      command: cmd,
+      expected: 'Confirm execution returns 0 without socket error or timeout',
+    }));
+  } else {
+    diagnosticSteps = [
+      {
+        step: 1,
+        action: `Verify interface counters and link status on ${iface}`,
+        command: `ip -s link show ${iface}`,
+        expected: 'Confirm drop counters and link operational carrier state',
+      },
+      {
+        step: 2,
+        action: 'Measure ICMP round-trip latency and packet loss',
+        command: 'ping -c 5 172.25.80.31',
+        expected: 'RTT < 50ms and 0% packet loss',
+      },
+      {
+        step: 3,
+        action: 'Inspect active socket connection states and buffer queues',
+        command: 'ss -s',
+        expected: 'No socket backlogs or unexpected TCP drops',
+      },
+    ];
+  }
 
   const verificationChecks = Array.isArray(raw.verificationChecks) ? raw.verificationChecks : [];
   const remediations = Array.isArray(raw.remediations) ? raw.remediations : [];
