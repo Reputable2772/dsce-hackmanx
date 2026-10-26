@@ -9,6 +9,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { apiClient } from '@/lib/api';
+import { useAppStore } from '@/stores/useAppStore';
 
 interface PacketItem {
   packet_id: string;
@@ -61,7 +62,19 @@ export const PacketForensicsTab: React.FC<PacketForensicsTabProps> = ({ incident
     loadPackets();
   }, [incidentId]);
 
+  const operatingMode = useAppStore((s) => s.operatingMode);
+
   const filteredPackets = packets.filter((p) => {
+    if (operatingMode === 'live') {
+      if (
+        p.labels?.source === 'synthetic' ||
+        p.labels?.is_synthetic === true ||
+        p.incident_id?.startsWith('syn-') ||
+        p.src_ip?.startsWith('10.0.')
+      ) {
+        return false;
+      }
+    }
     if (protocolFilter !== 'ALL' && p.protocol?.toUpperCase() !== protocolFilter) {
       return false;
     }
