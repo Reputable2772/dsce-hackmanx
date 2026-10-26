@@ -109,41 +109,63 @@ class PrecursorEngine:
         target_port: int = 80,
         interface_id: str = "eth0",
     ) -> str:
-        """Switch ingestion mode between 'synthetic' and 'live'."""
+        """Switch ingestion mode between 'synthetic' and 'live', ensuring clean buffer isolation."""
         mode_clean = mode.lower().strip()
         if mode_clean in ("live", "live_network", "live_probe"):
+            was_mode = self.mode
             self.mode = "live"
-            self.live_collector = LiveTelemetryCollector(
-                target_host=target_host,
-                target_port=target_port,
-                interface_id=interface_id,
-            )
+            if self.live_collector is None:
+                self.live_collector = LiveTelemetryCollector(
+                    target_host=target_host,
+                    target_port=target_port,
+                    interface_id=interface_id,
+                )
+            else:
+                self.live_collector.set_target(
+                    target_host=target_host,
+                    target_port=target_port,
+                    interface_id=interface_id,
+                )
+
+            # Purge synthetic points upon entering live mode to prevent synthetic dataset leakage
+            if was_mode != "live":
+                self.buffer.clear()
+                self.snapshot_history.clear()
+                self.incident_states.clear()
+                self.last_snapshot = None
+
+            effective_host = self.live_collector.target_host
+            effective_port = self.live_collector.target_port
+            effective_iface = self.live_collector.interface_id
+
             # Register monitored target node and link in system registry
             self.system_registry.register_node(
-                node_id=f"target-{target_host}",
-                name=f"Probe Target ({target_host}:{target_port})",
+                node_id=f"target-{effective_host}",
+                name=f"Probe Target ({effective_host}:{effective_port})",
                 node_type="gateway",
-                ip_address=target_host,
+                ip_address=effective_host,
                 status="healthy",
                 metadata={
                     "role": "Live Probe Target",
-                    "interfaceName": interface_id,
-                    "ipAddress": target_host,
-                    "firmware": "Upstream Network",
+                    "interfaceName": effective_iface,
+                    "ipAddress": effective_host,
+                    "firmware": "Live LAN / Workstation Target",
                 },
                 position=[5.0, 2.0, 0.0],
             )
             self.system_registry.register_link(
                 source_id="sys-core-engine",
-                target_id=f"target-{target_host}",
+                target_id=f"target-{effective_host}",
                 status="active",
                 metadata={
-                    "cableType": "Fiber Optic",
+                    "cableType": "Ethernet / Wi-Fi",
                     "bandwidthGbps": 1.0,
-                    "sourceInterface": interface_id,
-                    "targetInterface": "wan0",
+                    "sourceInterface": effective_iface,
+                    "targetInterface": "lan0",
                 },
             )
+            # Take immediate live sweep so system state is initialized
+            self.step_live()
         else:
             self.mode = "synthetic"
         return self.mode

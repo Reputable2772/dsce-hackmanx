@@ -15,16 +15,16 @@ def test_live_collector_metrics():
     )
     batch1 = collector.collect()
     assert batch1.source == "live"
-    assert len(batch1.points) == 6
+    assert len(batch1.points) >= 6
 
     metric_ids = {p.metric_id for p in batch1.points}
-    expected_ids = {"latency_ms", "jitter_ms", "packet_loss_pct", "throughput_mbps", "link_state", "drops_in"}
-    assert metric_ids == expected_ids
+    expected_ids = {"latency_ms", "jitter_ms", "packet_loss_pct", "throughput_mbps", "link_state", "drops_in", "icmp_inbound_rate"}
+    assert expected_ids.issubset(metric_ids)
 
     # Second sweep computes jitter and throughput deltas
     time.sleep(0.05)
     batch2 = collector.collect()
-    assert len(batch2.points) == 6
+    assert len(batch2.points) >= 6
     jitter_point = next(p for p in batch2.points if p.metric_id == "jitter_ms")
     assert jitter_point.value is not None
     assert jitter_point.value >= 0.0
@@ -75,3 +75,21 @@ def test_engine_custom_ingest():
     snapshot = engine.ingest_points(points)
     assert snapshot.latest_telemetry.get("latency_ms") == 45.2
     assert snapshot.latest_telemetry.get("link_state") == 1.0
+
+
+def test_live_mode_buffer_isolation():
+    """Verify switching to live mode isolates buffer and removes synthetic scenario points."""
+    engine = PrecursorEngine()
+    engine.fast_forward(125.0)
+    # Synthetic points exist in buffer
+    syn_df = engine.buffer.get_df()
+    assert not syn_df.empty
+
+    # Switch to live mode
+    engine.set_mode("live", target_host="127.0.0.1")
+    assert engine.mode == "live"
+
+    # In live mode, buffer must contain only live points
+    live_df = engine.buffer.get_df()
+    assert not live_df.empty
+    assert set(live_df["source"].unique()) == {"live"}

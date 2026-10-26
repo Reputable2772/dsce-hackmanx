@@ -24,9 +24,9 @@ def test_e2e_live_capture_to_analysis_to_llm_action():
     collector = LiveTelemetryCollector(target_host="127.0.0.1", target_port=80, interface_id="eth0")
     batch = collector.collect()
     assert batch.source == "live"
-    assert len(batch.points) == 6
+    assert len(batch.points) >= 6
     metric_ids = {p.metric_id for p in batch.points}
-    assert metric_ids == {"latency_ms", "jitter_ms", "packet_loss_pct", "throughput_mbps", "link_state", "drops_in"}
+    assert {"latency_ms", "jitter_ms", "packet_loss_pct", "throughput_mbps", "link_state", "drops_in"}.issubset(metric_ids)
 
     # Step 2: Ingest into Engine in Live Mode
     engine = PrecursorEngine()

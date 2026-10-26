@@ -28,6 +28,10 @@ class TelemetryBuffer:
         for p in points:
             self.add(p)
 
+    def clear(self) -> None:
+        """Clear all buffered telemetry points."""
+        self._buffer.clear()
+
     def get_window(
         self,
         start_time: float,
@@ -74,8 +78,9 @@ class TelemetryBuffer:
         start_time: Optional[float] = None,
         end_time: Optional[float] = None,
         metric_id: Optional[str] = None,
+        source: Optional[str] = None,
     ) -> pd.DataFrame:
-        """Convert buffer window to pandas DataFrame."""
+        """Convert buffer window to pandas DataFrame with optional source filtering."""
         if not self._buffer:
             return pd.DataFrame(columns=["timestamp", "metric_id", "value", "quality", "source", "interface_id"])
 
@@ -87,12 +92,14 @@ class TelemetryBuffer:
                 "timestamp": p.timestamp,
                 "metric_id": p.metric_id,
                 "value": p.value,
-                "quality": p.quality.value,
+                "quality": p.quality.value if hasattr(p.quality, "value") else str(p.quality),
                 "source": p.source,
                 "interface_id": p.interface_id,
             }
             for p in self._buffer
-            if t_start <= p.timestamp <= t_end and (metric_id is None or p.metric_id == metric_id)
+            if t_start <= p.timestamp <= t_end
+            and (metric_id is None or p.metric_id == metric_id)
+            and (source is None or p.source == source)
         ]
         return pd.DataFrame(records)
 

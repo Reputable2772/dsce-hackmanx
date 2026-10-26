@@ -19,16 +19,12 @@ export const SettingsPage: React.FC = () => {
   const isConnected = connectionState === 'connected';
 
   const {
-    theme,
     reducedMotion,
-    density,
     demoMode,
     showParticles,
     showNodeLabels,
     autoRotateCamera,
-    setTheme,
     setReducedMotion,
-    setDensity,
     setDemoMode,
     setShowParticles,
     setShowNodeLabels,
@@ -105,87 +101,17 @@ export const SettingsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Section 1: Visual Appearance */}
+        {/* Section 1: Display & Motion Preferences */}
         <div className="rounded-xl border border-[#E3E8F0] bg-white p-6 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
             <Palette className="h-5 w-5 text-[#5267D8]" />
             <h3 className="font-mono text-sm font-bold uppercase tracking-wider text-[#202938]">
-              Visual Appearance & Display
+              Display & Motion Preferences
             </h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Theme Selection */}
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#687386] mb-2 font-mono">
-                Theme Profile
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setTheme('cyberpunk-navy')}
-                  className={`rounded-lg border p-3 text-left transition-all ${
-                    theme === 'cyberpunk-navy' || true
-                      ? 'border-[#5267D8] bg-[#EEF2FF] text-[#5267D8] shadow-xs'
-                      : 'border-[#E3E8F0] bg-white text-[#687386] hover:bg-[#F8FAFC]'
-                  }`}
-                >
-                  <div className="font-bold text-xs text-[#202938]">PRECURSOR Light</div>
-                  <div className="text-[11px] text-[#687386] mt-1">Clean off-white, indigo actions, restrained teal accents</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTheme('dark-slate')}
-                  className={`rounded-lg border p-3 text-left transition-all ${
-                    theme === 'dark-slate'
-                      ? 'border-[#5267D8] bg-[#EEF2FF] text-[#5267D8]'
-                      : 'border-[#E3E8F0] bg-white text-[#687386] hover:bg-[#F8FAFC]'
-                  }`}
-                >
-                  <div className="font-bold text-xs text-[#202938]">High-Contrast Clean</div>
-                  <div className="text-[11px] text-[#687386] mt-1">Maximum legibility for bright control room walls</div>
-                </button>
-              </div>
-            </div>
-
-            {/* Layout Density */}
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#687386] mb-2 font-mono">
-                Layout Density
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setDensity('comfortable')}
-                  className={`rounded-lg border p-3 text-left transition-all ${
-                    density === 'comfortable'
-                      ? 'border-[#5267D8] bg-[#EEF2FF] text-[#5267D8] shadow-xs'
-                      : 'border-[#E3E8F0] bg-white text-[#687386] hover:bg-[#F8FAFC]'
-                  }`}
-                >
-                  <div className="font-bold text-xs text-[#202938]">Comfortable</div>
-                  <div className="text-[11px] text-[#687386] mt-1">Spacious padding & card gutters</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setDensity('compact')}
-                  className={`rounded-lg border p-3 text-left transition-all ${
-                    density === 'compact'
-                      ? 'border-[#5267D8] bg-[#EEF2FF] text-[#5267D8] shadow-xs'
-                      : 'border-[#E3E8F0] bg-white text-[#687386] hover:bg-[#F8FAFC]'
-                  }`}
-                >
-                  <div className="font-bold text-xs text-[#202938]">Compact</div>
-                  <div className="text-[11px] text-[#687386] mt-1">Higher information density for dense consoles</div>
-                </button>
-              </div>
-            </div>
-          </div>
-
           {/* Reduced Motion Switch */}
-          <div className="mt-6 pt-6 border-t border-[#E3E8F0] flex items-center justify-between">
+          <div className="flex items-center justify-between">
             <div className="space-y-1">
               <div className="text-xs font-semibold text-[#202938] flex items-center gap-2">
                 <span>Reduced Motion</span>
@@ -389,7 +315,7 @@ export const SettingsPage: React.FC = () => {
             <div className="rounded-lg border border-[#E3E8F0] bg-[#F8FAFC] p-4 text-xs">
               <h4 className="font-semibold text-[#202938] mb-1">Reset Demonstration Preferences</h4>
               <p className="text-[#687386] text-[11px] mb-3">
-                Restores particle visibility, node labels, and auto-rotation defaults without altering theme or density.
+                Restores particle visibility, node labels, and auto-rotation defaults.
               </p>
               {confirmResetDemo ? (
                 <div className="flex items-center gap-2">

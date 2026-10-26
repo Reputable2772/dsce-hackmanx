@@ -132,6 +132,9 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
 
     def _build_topology(self, snapshot: SystemSnapshot) -> Dict[str, Any]:
         """Generate dynamic topology representing Spine-Leaf fabric annotated with real backend telemetry."""
+        if getattr(self.engine, "mode", "synthetic") == "live":
+            return self.engine.system_registry.get_topology_graph()
+
         latest = snapshot.latest_telemetry or {}
         rtt = float(latest.get("latency_ms") or 18.2)
         jitter = float(latest.get("jitter_ms") or 1.4)
@@ -499,18 +502,25 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
 
             elif norm_path == "/api/telemetry":
                 window_sec = float(query.get("window", [300.0])[0])
-                df = self.engine.buffer.get_df()
+                source_req = query.get("source", [None])[0]
+                if not source_req and getattr(self.engine, "mode", "synthetic") == "live":
+                    source_req = "live"
+
+                t_latest = self.engine.buffer.get_latest_timestamp() or snapshot.timestamp
+                df = self.engine.buffer.get_df(
+                    start_time=max(0.0, t_latest - window_sec),
+                    end_time=t_latest + 1.0,
+                    source=source_req if source_req in ("live", "synthetic") else None,
+                )
                 points_data = []
                 if not df.empty:
-                    # Filter to recent window
-                    t_latest = self.engine.buffer.get_latest_timestamp() or snapshot.timestamp
-                    recent_df = df[df["timestamp"] >= (t_latest - window_sec)]
-                    points_data = recent_df.to_dict(orient="records")
+                    points_data = df.to_dict(orient="records")
                 self._send_json(200, {
                     "count": len(points_data),
                     "window_seconds": window_sec,
                     "latest": snapshot.latest_telemetry,
                     "points": points_data,
+                    "mode": getattr(self.engine, "mode", "synthetic"),
                 })
 
             elif norm_path == "/api/gate":
@@ -546,7 +556,12 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
                 })
 
             elif norm_path == "/api/incidents":
+                source_filter = query.get("source", [None])[0]
+                if not source_filter and getattr(self.engine, "mode", "synthetic") == "live":
+                    source_filter = "live"
                 serialized = [i.model_dump() for i in snapshot.incidents]
+                if source_filter in ("live", "synthetic"):
+                    serialized = [i for i in serialized if i.get("source") == source_filter or getattr(self.engine, "mode", None) == source_filter]
                 self._send_json(200, {
                     "total": len(serialized),
                     "incidents": serialized,

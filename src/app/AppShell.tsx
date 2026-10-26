@@ -2,11 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { LeftSidebar } from '@/components/layout/LeftSidebar';
 import { TopHeader } from '@/components/layout/TopHeader';
-import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useAppStore } from '@/stores/useAppStore';
 
 export const AppShell: React.FC = () => {
-  const { density } = useSettingsStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -17,10 +15,8 @@ export const AppShell: React.FC = () => {
     };
   }, []);
 
-  const densityClass = density === 'compact' ? 'text-xs' : '';
-
   return (
-    <div className={`flex min-h-screen bg-[#F6F8FB] text-[#202938] ${densityClass}`}>
+    <div className="flex min-h-screen bg-[#F6F8FB] text-[#202938]">
       {/* Desktop Persistent Left Sidebar */}
       <div className="hidden lg:flex shrink-0">
         <LeftSidebar />
