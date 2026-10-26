@@ -156,6 +156,36 @@ export class PrecursorApiClient {
     }
     return res.json();
   }
+
+  public async fetchMode(): Promise<any> {
+    const res = await fetch(`${this.config.baseUrl}/api/mode`);
+    if (!res.ok) {
+      throw new Error(`Mode fetch failed with status ${res.status}`);
+    }
+    return res.json();
+  }
+
+  public async setMode(
+    mode: 'synthetic' | 'live',
+    targetHost?: string,
+    targetPort?: number,
+    interfaceId?: string
+  ): Promise<any> {
+    const res = await fetch(`${this.config.baseUrl}/api/mode`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mode,
+        target_host: targetHost,
+        target_port: targetPort,
+        interface_id: interfaceId,
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`Mode update failed with status ${res.status}`);
+    }
+    return res.json();
+  }
 }
 
 export const apiClient = new PrecursorApiClient();

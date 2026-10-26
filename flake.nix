@@ -18,6 +18,7 @@
             python3
             python3Packages.pip
             python3Packages.virtualenv
+            nodejs_22
             stdenv.cc.cc.lib
             zlib
             glib

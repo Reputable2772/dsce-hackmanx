@@ -22,7 +22,8 @@ class LiveTelemetryCollector:
         self.target_port = target_port
         self.interface_id = interface_id
         self.poll_interval = poll_interval_seconds
-        self._prev_stats: Optional[Dict[str, int]] = None
+        self._prev_rtt: Optional[float] = None
+        self._prev_stats: Optional[Dict[str, float]] = None
         self._prev_time: Optional[float] = None
 
     def probe_latency(self) -> tuple[Optional[float], MetricQuality]:
@@ -51,25 +52,64 @@ class LiveTelemetryCollector:
             try:
                 with open(proc_path, "r", encoding="utf-8") as f:
                     lines = f.readlines()
+                matched = False
+                non_lo_lines = []
                 for line in lines[2:]:
                     parts = line.split(":")
                     if len(parts) == 2:
                         iface = parts[0].strip()
+                        if iface != "lo":
+                            non_lo_lines.append((iface, parts[1].split()))
                         if iface == self.interface_id or self.interface_id in ("all", "*"):
                             data = parts[1].split()
                             stats["rx_bytes"] += float(data[0])
                             stats["rx_errors"] += float(data[2])
                             stats["rx_drops"] += float(data[3])
                             stats["tx_bytes"] += float(data[8])
+                            matched = True
+                # If explicit interface_id not matched, fallback to first non-lo interface
+                if not matched and non_lo_lines:
+                    iface, data = non_lo_lines[0]
+                    stats["rx_bytes"] += float(data[0])
+                    stats["rx_errors"] += float(data[2])
+                    stats["rx_drops"] += float(data[3])
+                    stats["tx_bytes"] += float(data[8])
             except Exception:
                 pass
         return stats
 
     def collect(self) -> MetricBatch:
-        """Execute a single collection sweep and return a MetricBatch."""
+        """Execute a single collection sweep and return a complete MetricBatch."""
         now = time.time()
         rtt, rtt_quality = self.probe_latency()
         stats = self.read_interface_stats()
+
+        # 1. Jitter computation from successive RTT deltas
+        if rtt is not None and self._prev_rtt is not None:
+            jitter = round(abs(rtt - self._prev_rtt), 2)
+            jitter_quality = MetricQuality.GOOD
+        else:
+            jitter = 0.0
+            jitter_quality = MetricQuality.GOOD if rtt is not None else MetricQuality.MISSING
+        self._prev_rtt = rtt
+
+        # 2. Packet loss percentage
+        if rtt is None:
+            loss_pct = 100.0
+            loss_quality = MetricQuality.MISSING
+        else:
+            loss_pct = 0.0
+            loss_quality = MetricQuality.GOOD
+
+        # 3. Throughput calculation from byte counter deltas
+        throughput_mbps = 0.0
+        if self._prev_stats is not None and self._prev_time is not None:
+            dt = max(0.1, now - self._prev_time)
+            delta_bytes = (stats["rx_bytes"] - self._prev_stats["rx_bytes"]) + (stats["tx_bytes"] - self._prev_stats["tx_bytes"])
+            if delta_bytes >= 0:
+                throughput_mbps = round((delta_bytes * 8.0) / (dt * 1e6), 3)
+        self._prev_stats = stats
+        self._prev_time = now
 
         points = [
             TelemetryPoint(
@@ -80,6 +120,30 @@ class LiveTelemetryCollector:
                 source="live",
                 interface_id=self.interface_id,
                 labels={"target": f"{self.target_host}:{self.target_port}"},
+            ),
+            TelemetryPoint(
+                timestamp=now,
+                metric_id="jitter_ms",
+                value=jitter,
+                quality=jitter_quality,
+                source="live",
+                interface_id=self.interface_id,
+            ),
+            TelemetryPoint(
+                timestamp=now,
+                metric_id="packet_loss_pct",
+                value=loss_pct,
+                quality=loss_quality,
+                source="live",
+                interface_id=self.interface_id,
+            ),
+            TelemetryPoint(
+                timestamp=now,
+                metric_id="throughput_mbps",
+                value=throughput_mbps,
+                quality=MetricQuality.GOOD,
+                source="live",
+                interface_id=self.interface_id,
             ),
             TelemetryPoint(
                 timestamp=now,

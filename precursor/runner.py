@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from precursor.telemetry.schema import TelemetryPoint, MetricBatch, MetricQuality
 from precursor.telemetry.buffer import TelemetryBuffer
+from precursor.telemetry.live_collector import LiveTelemetryCollector
 from precursor.telemetry.synthetic import (
     SyntheticTelemetryGenerator,
     SyntheticScenarioConfig,
@@ -84,8 +85,41 @@ class PrecursorEngine:
         self.last_evaluation: Optional[ScenarioComparisonResult] = None
         self.storage_manager = RunStorageManager()
 
+        # Ingestion Mode: "synthetic" (default) or "live"
+        self.mode: str = "synthetic"
+        self.live_collector: Optional[LiveTelemetryCollector] = None
+
+    def set_mode(
+        self,
+        mode: str,
+        target_host: str = "127.0.0.1",
+        target_port: int = 80,
+        interface_id: str = "eth0",
+    ) -> str:
+        """Switch ingestion mode between 'synthetic' and 'live'."""
+        mode_clean = mode.lower().strip()
+        if mode_clean in ("live", "live_network", "live_probe"):
+            self.mode = "live"
+            self.live_collector = LiveTelemetryCollector(
+                target_host=target_host,
+                target_port=target_port,
+                interface_id=interface_id,
+            )
+        else:
+            self.mode = "synthetic"
+        return self.mode
+
+    def step_live(self) -> SystemSnapshot:
+        """Collect one live telemetry batch from host socket/network interfaces and compute pipeline."""
+        if self.live_collector is None:
+            self.live_collector = LiveTelemetryCollector(interface_id=self.interface_id)
+        batch = self.live_collector.collect()
+        self.buffer.add_batch(batch.points)
+        return self._evaluate_pipeline(batch.timestamp)
+
     def reset_scenario(self, scenario_type: ScenarioType, seed: int = 42):
         """Switch to a new synthetic scenario and reset the internal buffer."""
+        self.mode = "synthetic"
         self.scenario_type = scenario_type
         self.seed = seed
         self.config = SyntheticScenarioConfig(scenario_type=scenario_type, seed=seed, interface_id=self.interface_id)
@@ -102,7 +136,9 @@ class PrecursorEngine:
         return self._evaluate_pipeline(t_now)
 
     def step_simulation(self) -> SystemSnapshot:
-        """Advance the synthetic generator by one 5-second step and compute the pipeline."""
+        """Advance the simulation/collection by one 5-second step and compute the pipeline."""
+        if self.mode == "live":
+            return self.step_live()
         batch = self.generator.step()
         self.buffer.add_batch(batch.points)
         return self._evaluate_pipeline(batch.timestamp)

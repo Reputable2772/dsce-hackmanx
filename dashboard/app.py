@@ -103,9 +103,13 @@ with st.sidebar:
 
     else:
         st.markdown("#### 🔌 Live Probe Settings")
-        st.text_input("Target Host / Gateway", value="127.0.0.1")
-        st.number_input("Target Port", value=80, min_value=1, max_value=65535)
-        st.text_input("Interface ID", value="eth0")
+        live_host = st.text_input("Target Host / Gateway", value="127.0.0.1")
+        live_port = st.number_input("Target Port", value=80, min_value=1, max_value=65535)
+        live_iface = st.text_input("Interface ID", value="eth0")
+
+        st.session_state.collector.target_host = live_host
+        st.session_state.collector.target_port = int(live_port)
+        st.session_state.collector.interface_id = live_iface
 
         if st.button("Poll Live Now", width="stretch"):
             live_batch = st.session_state.collector.collect()
@@ -113,16 +117,27 @@ with st.sidebar:
             st.session_state.sim_steps += 1
             st.rerun()
 
+        st.markdown("---")
+        auto_play = st.toggle("Continuous Live Polling (2s)", value=st.session_state.is_auto_playing)
+        st.session_state.is_auto_playing = auto_play
+
     st.markdown("---")
     st.markdown("### ⚙️ Operator SLA Limits")
     sla_threshold = st.slider("Latency SLA Limit (ms)", min_value=30.0, max_value=150.0, value=75.0, step=5.0)
 
 # Continuous Playback Loop Handler
-if st.session_state.is_auto_playing and mode == "Synthetic Replay":
-    st.session_state.snapshot = st.session_state.engine.step_simulation()
-    st.session_state.sim_steps += 1
-    time.sleep(0.5)
-    st.rerun()
+if st.session_state.is_auto_playing:
+    if mode == "Synthetic Replay":
+        st.session_state.snapshot = st.session_state.engine.step_simulation()
+        st.session_state.sim_steps += 1
+        time.sleep(0.5)
+        st.rerun()
+    elif mode == "Live Linux Probes":
+        live_batch = st.session_state.collector.collect()
+        st.session_state.snapshot = st.session_state.engine.ingest_points(live_batch.points)
+        st.session_state.sim_steps += 1
+        time.sleep(2.0)
+        st.rerun()
 
 # 5. Extract Recent Metrics & Compute Diagnostics from PrecursorEngine
 snapshot: SystemSnapshot = st.session_state.snapshot
@@ -264,10 +279,11 @@ with tab3:
     if "eval_cache" not in st.session_state:
         st.session_state.eval_cache = {}
 
-    if selected_type.value not in st.session_state.eval_cache:
-        st.session_state.eval_cache[selected_type.value] = st.session_state.engine.run_paired_evaluation(selected_type, seed=42)
+    curr_type = getattr(st.session_state.engine, "scenario_type", ScenarioType.GRADUAL_DEGRADATION)
+    if curr_type.value not in st.session_state.eval_cache:
+        st.session_state.eval_cache[curr_type.value] = st.session_state.engine.run_paired_evaluation(curr_type, seed=42)
 
-    comparison = st.session_state.eval_cache[selected_type.value]
+    comparison = st.session_state.eval_cache[curr_type.value]
     on_15 = comparison.gate_on.get(15) or comparison.gate_on.get(5)
     off_15 = comparison.gate_off.get(15) or comparison.gate_off.get(5)
     if on_15 and off_15:

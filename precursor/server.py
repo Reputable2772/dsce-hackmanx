@@ -15,6 +15,7 @@ from socketserver import ThreadingMixIn
 import threading
 
 from precursor.runner import PrecursorEngine, SystemSnapshot
+from precursor.telemetry.schema import TelemetryPoint
 from precursor.telemetry.synthetic import ScenarioType
 from precursor.gate.states import GateState
 
@@ -87,9 +88,23 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
                 self.engine.step_simulation()
             snapshot = self.engine.last_snapshot
 
-            if path == "/api/status":
+            if path == "/api/snapshot":
+                self._send_json(200, snapshot.model_dump())
+
+            elif path == "/api/mode":
+                self._send_json(200, {
+                    "mode": getattr(self.engine, "mode", "synthetic"),
+                    "scenario": self.engine.scenario_type.value,
+                    "target_host": getattr(self.engine.live_collector, "target_host", "127.0.0.1") if self.engine.live_collector else "127.0.0.1",
+                    "target_port": getattr(self.engine.live_collector, "target_port", 80) if self.engine.live_collector else 80,
+                    "interface_id": getattr(self.engine.live_collector, "interface_id", self.engine.interface_id) if self.engine.live_collector else self.engine.interface_id,
+                    "timestamp": snapshot.timestamp,
+                })
+
+            elif path == "/api/status":
                 q_stats = self.engine.buffer.quality_stats(window_seconds=300.0)
                 self._send_json(200, {
+                    "mode": getattr(self.engine, "mode", "synthetic"),
                     "scenario": self.engine.scenario_type.value,
                     "timestamp": snapshot.timestamp,
                     "gate_state": snapshot.gate_decision.state.value,
@@ -209,7 +224,50 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
         body = self._read_json_body()
 
         with self.engine_lock:
-            if path in ("/api/step", "/api/simulation/step"):
+            if path in ("/api/mode", "/api/mode/set"):
+                mode = body.get("mode", "live")
+                target_host = body.get("target_host", "127.0.0.1")
+                target_port = int(body.get("target_port", 80))
+                interface_id = body.get("interface_id", self.engine.interface_id)
+                active_mode = self.engine.set_mode(
+                    mode=mode,
+                    target_host=target_host,
+                    target_port=target_port,
+                    interface_id=interface_id,
+                )
+                snapshot = self.engine.step_simulation()
+                self._send_json(200, {
+                    "status": "mode_updated",
+                    "mode": active_mode,
+                    "target_host": target_host,
+                    "target_port": target_port,
+                    "interface_id": interface_id,
+                    "timestamp": snapshot.timestamp,
+                    "gate_state": snapshot.gate_decision.state.value,
+                    "latest_metrics": snapshot.latest_telemetry,
+                })
+
+            elif path in ("/api/telemetry/ingest", "/api/ingest"):
+                raw_points = body.get("points", [])
+                ingested = []
+                for p in raw_points:
+                    try:
+                        ingested.append(TelemetryPoint(**p))
+                    except Exception:
+                        pass
+                if ingested:
+                    snapshot = self.engine.ingest_points(ingested)
+                    self._send_json(200, {
+                        "status": "ingested",
+                        "count": len(ingested),
+                        "timestamp": snapshot.timestamp,
+                        "gate_state": snapshot.gate_decision.state.value,
+                        "latest_metrics": snapshot.latest_telemetry,
+                    })
+                else:
+                    self._send_json(400, {"error": "No valid telemetry points provided in 'points' array"})
+
+            elif path in ("/api/step", "/api/simulation/step"):
                 seconds = float(body.get("seconds", 5.0))
                 steps = max(1, int(seconds / 5.0))
                 for _ in range(steps):
@@ -231,9 +289,8 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
                 except ValueError:
                     sc_type = ScenarioType.GRADUAL_DEGRADATION
                 self.engine.reset_scenario(sc_type, seed=seed)
-                # Seed baseline
-                for _ in range(25):
-                    snapshot = self.engine.step_simulation()
+                # Seed baseline instantly
+                snapshot = self.engine.fast_forward(125.0)
                 self._send_json(200, {
                     "status": "reset",
                     "scenario": sc_type.value,
@@ -284,9 +341,8 @@ def create_server(
     """Instantiate and configure the PRECURSOR threaded HTTP server."""
     if engine is None:
         engine = PrecursorEngine(scenario_type=ScenarioType.GRADUAL_DEGRADATION, seed=42)
-        # Pre-seed nominal 25 steps for baseline
-        for _ in range(25):
-            engine.step_simulation()
+        # Pre-seed nominal 25 steps (125s) for baseline instantly
+        engine.fast_forward(125.0)
 
     PrecursorApiHandler.engine = engine
     PrecursorApiHandler.engine_lock = threading.Lock()
