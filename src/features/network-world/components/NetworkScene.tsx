@@ -47,9 +47,9 @@ export const NetworkScene: React.FC<NetworkSceneProps> = ({
 
   return (
     <>
-      {/* Fog & Background for Atmospheric Depth */}
-      <color attach="background" args={['#0B0D1B']} />
-      <fog attach="fog" args={['#0B0D1B', 22, 58]} />
+      {/* Fog & Background for Clean Engineering Light Theme */}
+      <color attach="background" args={['#F6F8FB']} />
+      <fog attach="fog" args={['#F6F8FB', 24, 62]} />
 
       {/* Orbit Navigation Controls */}
       <OrbitControls
@@ -65,27 +65,27 @@ export const NetworkScene: React.FC<NetworkSceneProps> = ({
       />
 
       {/* Studio Lighting Rig */}
-      <ambientLight intensity={0.65} color="#D9D2FF" />
-      <directionalLight position={[14, 24, 18]} intensity={1.4} color="#FFFFFF" castShadow />
-      <pointLight position={[0, -3.5, 0]} intensity={0.8} color="#48DDF5" distance={35} />
-      <pointLight position={[0, 9, -5]} intensity={1.1} color="#9B7BFF" distance={30} />
-      <pointLight position={[-12, 6, 8]} intensity={0.5} color="#45D6B5" distance={25} />
+      <ambientLight intensity={0.9} color="#FFFFFF" />
+      <directionalLight position={[14, 24, 18]} intensity={1.5} color="#FFFFFF" castShadow />
+      <pointLight position={[0, -3.5, 0]} intensity={0.6} color="#159E98" distance={35} />
+      <pointLight position={[0, 9, -5]} intensity={0.8} color="#5267D8" distance={30} />
+      <pointLight position={[-12, 6, 8]} intensity={0.5} color="#159E98" distance={25} />
 
       {/* Atmospheric Ambient Sparkles */}
       {showParticles && !reducedMotion && (
         <Sparkles
-          count={55}
+          count={35}
           scale={28}
-          size={1.8}
-          speed={0.25}
-          opacity={0.35}
-          color="#9B7BFF"
+          size={1.5}
+          speed={0.2}
+          opacity={0.25}
+          color="#5267D8"
         />
       )}
 
-      {/* Ground Substrate Perspective Cyber Grid Plane */}
+      {/* Ground Substrate Perspective Precision Grid Plane */}
       <group position={[0, -3.2, 0]}>
-        <gridHelper args={[48, 48, '#4E3880', '#13162C']} />
+        <gridHelper args={[48, 48, '#CBD5E1', '#E2E8F0']} />
       </group>
 
       {/* Background Click Listener for Deselection */}

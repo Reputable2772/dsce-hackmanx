@@ -5,6 +5,8 @@ import {
   getTimelineForScenario,
   getEvaluationForScenario,
 } from './fixtures/simulationFixture';
+import { apiClient } from '@/lib/api';
+import { useAppStore } from '@/stores/useAppStore';
 
 interface SimulationStore {
   // Configuration
@@ -102,12 +104,49 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
     return Object.keys(errors).length === 0;
   },
 
-  runDemo: () => {
+  runDemo: async () => {
     const { config, validate } = get();
     if (!validate()) return;
 
+    set({ phase: 'running' });
     const timeline = getTimelineForScenario(config.scenarioId, config.seed);
-    const evaluation = getEvaluationForScenario(config.scenarioId);
+    let evaluation = getEvaluationForScenario(config.scenarioId);
+
+    const isConnected = useAppStore.getState().connectionState === 'connected';
+    if (isConnected) {
+      try {
+        await apiClient.resetScenario(config.scenarioId, config.seed);
+        const evalRes = await apiClient.runEvaluation(config.scenarioId, config.seed);
+        if (evalRes && evalRes.result) {
+          const on5 = evalRes.result.gate_on?.['5'] || {};
+          const off5 = evalRes.result.gate_off?.['5'] || {};
+          evaluation = {
+            scenarioId: config.scenarioId,
+            scenarioName: config.scenarioId.replace(/_/g, ' ').toUpperCase(),
+            seed: config.seed,
+            gateOn: {
+              detectedEvents: on5.recall != null ? Math.round(on5.recall * 10) : 1,
+              falseAlarmsPerHour: Number(on5.false_alarms_per_hour ?? 0.0),
+              warningLeadTimeMinutes: Number(on5.warning_lead_time_minutes ?? 0.0),
+              lateOrMissedEvents: Number(on5.missed_faults ?? 0),
+              abstentionRate: Number(on5.abstention_rate ?? 0.0),
+              totalPredictionWindows: 12,
+            },
+            gateOff: {
+              detectedEvents: off5.recall != null ? Math.round(off5.recall * 10) : 1,
+              falseAlarmsPerHour: Number(off5.false_alarms_per_hour ?? 0.0),
+              warningLeadTimeMinutes: Number(off5.warning_lead_time_minutes ?? 0.0),
+              lateOrMissedEvents: Number(off5.missed_faults ?? 0),
+              abstentionRate: Number(off5.abstention_rate ?? 0.0),
+              totalPredictionWindows: 12,
+            },
+            explanation: `Reproducible evaluation benchmark executed against Python PrecursorEngine (seed ${config.seed}). Paired GATE ON vs GATE OFF run across 5m, 15m, and 30m horizons.`,
+          };
+        }
+      } catch {
+        // Fall back to deterministic evaluation fixture
+      }
+    }
 
     set({
       phase: 'completed',
@@ -117,7 +156,11 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
     });
   },
 
-  resetDemo: () =>
+  resetDemo: () => {
+    const isConnected = useAppStore.getState().connectionState === 'connected';
+    if (isConnected) {
+      apiClient.resetScenario('gradual_degradation', 42).catch(() => {});
+    }
     set({
       config: { ...defaultConfig },
       phase: 'idle',
@@ -125,5 +168,6 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
       activeStageIndex: 0,
       evaluation: null,
       validationErrors: {},
-    }),
+    });
+  },
 }));

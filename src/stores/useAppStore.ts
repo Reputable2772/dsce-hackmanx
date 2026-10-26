@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { GateState, ConnectionState, DemoMode } from '@/types';
-import { apiClient } from '@/lib/api';
+import { apiClient, BackendStatusResponse, BackendHealthResponse } from '@/lib/api';
 
 import { useSettingsStore } from './useSettingsStore';
 
@@ -13,6 +13,9 @@ interface AppStoreState {
   selectedIncidentId: string | null;
   backendVersion: string | null;
   lastSyncTimestamp: number | null;
+  latestStatus: BackendStatusResponse | null;
+  backendHealth: BackendHealthResponse | null;
+  lastStatusUpdate: number | null;
 
   // Actions
   setDemoMode: (mode: DemoMode) => void;
@@ -35,6 +38,9 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   selectedIncidentId: 'INC-2026-0842',
   backendVersion: null,
   lastSyncTimestamp: null,
+  latestStatus: null,
+  backendHealth: null,
+  lastStatusUpdate: null,
 
   setDemoMode: (demoMode) => {
     set({ demoMode });
@@ -55,10 +61,14 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       const health = await apiClient.checkHealth();
       if (health && health.status === 'ok') {
         const status = await apiClient.fetchStatus().catch(() => null);
+        const now = Date.now();
         set({
           connectionState: 'connected',
           backendVersion: health.version,
-          lastSyncTimestamp: Date.now(),
+          backendHealth: health,
+          latestStatus: status,
+          lastSyncTimestamp: now,
+          lastStatusUpdate: now,
           ...(status?.gate_state ? { gateState: status.gate_state as GateState } : {}),
           ...(status?.scenario ? { activeScenario: status.scenario } : {}),
         });

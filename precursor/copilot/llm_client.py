@@ -11,6 +11,8 @@ from precursor.incidents.schema import Incident
 from precursor.copilot.runbook_matcher import RunbookMatch
 from precursor.copilot.claim_verifier import NumericalClaimVerifier, ClaimVerification
 
+import time
+
 DEFAULT_OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 
 
@@ -43,20 +45,30 @@ class OllamaCopilot:
         self.preferred_model = preferred_model
         self.timeout_seconds = timeout_seconds
         self.verifier = NumericalClaimVerifier(tolerance=0.10)
+        self._last_model_check: float = 0.0
+        self._cached_model: Optional[str] = None
 
     def _get_available_model(self) -> Optional[str]:
-        """Detect any local models in Ollama, or return None if offline."""
+        """Detect any local models in Ollama, or return None if offline (cached for 15s)."""
+        now = time.time()
+        if (now - self._last_model_check) < 15.0:
+            return self._cached_model
+
+        self._last_model_check = now
         try:
-            r = requests.get(f"{self.base_url}/api/tags", timeout=1.5)
+            r = requests.get(f"{self.base_url}/api/tags", timeout=1.0)
             if r.status_code == 200:
                 models = r.json().get("models", [])
                 if models:
                     names = [m["name"] for m in models]
                     if self.preferred_model in names:
+                        self._cached_model = self.preferred_model
                         return self.preferred_model
+                    self._cached_model = names[0]
                     return names[0]
         except Exception:
             pass
+        self._cached_model = None
         return None
 
     def explain_and_recommend(
@@ -145,6 +157,107 @@ Format your response under these 5 headings:
             raw_llm_output=raw_text,
             model_used=used_model,
         )
+
+    def query(
+        self,
+        prompt: str,
+        telemetry_snapshot: Dict[str, Optional[float]],
+        incident: Optional[Incident] = None,
+        runbook_matches: Optional[List[RunbookMatch]] = None,
+    ) -> CopilotResponse:
+        """Process an arbitrary natural-language operator query or investigation prompt."""
+        from precursor.copilot.runbook_matcher import RunbookMatcher
+        if runbook_matches is None:
+            matcher = RunbookMatcher()
+            runbook_matches = matcher.match_text(prompt, top_k=2)
+
+        model = self._get_available_model()
+        matched_rb_text = "\n\n".join([m.content for m in runbook_matches]) if runbook_matches else "No matching runbook."
+        telemetry_str = ", ".join([f"{k}: {v}" for k, v in telemetry_snapshot.items() if v is not None])
+
+        llm_prompt = f"""You are PRECURSOR Network Copilot.
+The operator asked: "{prompt}"
+
+Current Network Telemetry:
+{telemetry_str}
+
+Runbook Context:
+{matched_rb_text}
+
+Provide a structured, grounded network analysis based strictly on the telemetry and runbook context.
+Format your response under these 5 headings:
+### Summary
+### Hypotheses
+### Diagnostic Commands
+### Verification Steps
+### Risks and Rollback
+"""
+        raw_text = None
+        used_model = "offline_heuristic_fallback"
+        if model:
+            try:
+                payload = {
+                    "model": model,
+                    "prompt": llm_prompt,
+                    "stream": False,
+                    "options": {"temperature": 0.2, "top_p": 0.9},
+                }
+                resp = requests.post(f"{self.base_url}/api/generate", json=payload, timeout=self.timeout_seconds)
+                if resp.status_code == 200:
+                    raw_text = resp.json().get("response", "")
+                    used_model = model
+            except Exception:
+                raw_text = None
+
+        if not raw_text:
+            rb = runbook_matches[0] if runbook_matches else None
+            cmds = ["ip -s link show dev eth0", "ping -c 5 1.1.1.1", "ss -s"]
+            if rb:
+                found_cmds = re.findall(r"```bash\n(.*?)\n```", rb.content, re.DOTALL)
+                if found_cmds:
+                    cmds = [line.strip() for line in found_cmds[0].split("\n") if line.strip() and not line.startswith("#")]
+
+            telem_lines = [f"- {k}: {v}" for k, v in telemetry_snapshot.items() if v is not None]
+            rb_title = rb.title if rb else "General Network Telemetry Triage"
+            raw_text = f"""### Summary
+Analysis for query: "{prompt}".
+Matched runbook: {rb_title}.
+Current telemetry snapshot:
+{chr(10).join(telem_lines[:6])}
+
+### Hypotheses
+- Dynamic traffic fluctuations or queue buffer growth under current load (Hypothesis)
+- Transient route recalculation or peer interface congestion (Hypothesis)
+- Metric trends require continuous multi-horizon monitoring (Hypothesis)
+
+### Diagnostic Commands
+```bash
+{chr(10).join(cmds[:3])}
+```
+
+### Verification Steps
+- Validate interface telemetry returns to baseline thresholds
+- Confirm latency and packet loss remain within contractual SLA
+- Monitor sliding-window telemetry buffer for residual divergence
+
+### Risks and Rollback
+- Risk: Command execution on production interfaces may alter queue scheduling.
+- Rollback: Preserve existing traffic policing rules and restore standard routing policies.
+"""
+        claims = self.verifier.verify_response(raw_text, telemetry_snapshot)
+        parsed = self._parse_sections(raw_text)
+
+        return CopilotResponse(
+            summary=parsed.get("summary", f"Grounded response for query: {prompt}"),
+            hypotheses=parsed.get("hypotheses", ["Potential traffic surge or path convergence (Hypothesis)"]),
+            diagnostic_commands=parsed.get("diagnostic_commands", ["ip -s link", "ping -c 5 1.1.1.1"]),
+            verification_steps=parsed.get("verification_steps", ["Verify SLA adherence across 5m, 15m, and 30m"]),
+            risks_and_rollback=parsed.get("risks_and_rollback", ["Do not restart interfaces without rollback plan"]),
+            claims=claims,
+            raw_llm_output=raw_text,
+            model_used=used_model,
+        )
+
 
     def _generate_heuristic_fallback(
         self,

@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { PageContainer } from '@/components/layout/PageContainer';
+import { Radio } from 'lucide-react';
 import { TelemetryControls } from './components/TelemetryControls';
 import { TelemetryMetricCards } from './components/TelemetryMetricCards';
 import { TelemetryChartSection } from './components/TelemetryChartSection';
@@ -10,12 +11,83 @@ import {
   TELEMETRY_EVENT_WINDOWS, 
   TELEMETRY_QUALITY_AUDIT 
 } from './fixtures/telemetryFixture';
-import { TimeRange, MetricId, NetworkSegment } from './types';
+import { TimeRange, MetricId, NetworkSegment, MetricSummary, DataQualityAudit } from './types';
+import { useAppStore } from '@/stores/useAppStore';
+import { apiClient } from '@/lib/api';
 
 export const TelemetryPage: React.FC = () => {
   const [selectedRange, setSelectedRange] = useState<TimeRange>('5m');
   const [selectedMetric, setSelectedMetric] = useState<MetricId | 'all'>('all');
   const [selectedSegment, setSelectedSegment] = useState<NetworkSegment>('all');
+
+  const connectionState = useAppStore((s) => s.connectionState);
+  const isConnected = connectionState === 'connected';
+
+  const [metrics, setMetrics] = useState<MetricSummary[]>(INITIAL_METRIC_SUMMARIES);
+  const [qualityAudit, setQualityAudit] = useState<DataQualityAudit>(TELEMETRY_QUALITY_AUDIT);
+
+  useEffect(() => {
+    if (!isConnected) {
+      setMetrics(INITIAL_METRIC_SUMMARIES);
+      setQualityAudit(TELEMETRY_QUALITY_AUDIT);
+      return;
+    }
+
+    let isMounted = true;
+    const loadLiveTelemetry = async () => {
+      try {
+        const status = await apiClient.fetchStatus();
+        if (!isMounted || !status) return;
+
+        const latest = status.latest_metrics || {};
+        const q = status.quality_stats || {};
+
+        setMetrics((prev) =>
+          prev.map((m) => {
+            if (m.id === 'rtt_ms' && latest.latency_ms != null) {
+              return { ...m, currentValue: Number(latest.latency_ms) };
+            }
+            if (m.id === 'jitter_ms' && latest.jitter_ms != null) {
+              return { ...m, currentValue: Number(latest.jitter_ms) };
+            }
+            if (m.id === 'packet_loss_pct' && latest.packet_loss_pct != null) {
+              return { ...m, currentValue: Number(latest.packet_loss_pct) };
+            }
+            if (m.id === 'throughput_mbps' && latest.throughput_mbps != null) {
+              return { ...m, currentValue: Number(latest.throughput_mbps) };
+            }
+            if (m.id === 'interface_errors' && latest.drops_in != null) {
+              return { ...m, currentValue: Number(latest.drops_in) };
+            }
+            return m;
+          })
+        );
+
+        if (q.total_points != null) {
+          const total = Number(q.total_points) || 1;
+          const goodRatio = q.good_ratio ?? 1.0;
+          setQualityAudit((prev) => ({
+            ...prev,
+            totalObservations: total,
+            healthyCount: Math.round(total * goodRatio),
+            missingCount: Math.round(total * (q.missing_ratio ?? 0)),
+            staleCount: Math.round(total * (q.stale_ratio ?? 0)),
+            invalidCount: Math.round(total * (q.invalid_ratio ?? 0)),
+            sensorHealthScore: Number(goodRatio.toFixed(3)),
+          }));
+        }
+      } catch {
+        // Keep previous state gracefully
+      }
+    };
+
+    loadLiveTelemetry();
+    const timer = setInterval(loadLiveTelemetry, 4000);
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
+  }, [isConnected]);
 
   // Filter time series data based on selections
   const filteredData = useMemo(() => {
@@ -49,6 +121,18 @@ export const TelemetryPage: React.FC = () => {
     <PageContainer
       title="Telemetry Explorer & Time-Series Stream"
       subtitle="5-second granularity network telemetry observation buffer across Spine-Leaf fabric nodes with real-time sensor quality verification."
+      action={
+        isConnected ? (
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 font-mono text-xs text-emerald-400 animate-pulse">
+            <Radio className="h-3 w-3" />
+            <span>Live Telemetry Buffer (Python Engine)</span>
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-1 font-mono text-xs text-slate-400">
+            <span>Illustrative Demonstration Fixtures</span>
+          </span>
+        )
+      }
     >
       <div className="space-y-6">
         {/* Filter Toolbar */}
@@ -64,8 +148,8 @@ export const TelemetryPage: React.FC = () => {
 
         {/* 6 Overview Metric Cards */}
         <TelemetryMetricCards
-          metrics={INITIAL_METRIC_SUMMARIES}
-          qualityAudit={TELEMETRY_QUALITY_AUDIT}
+          metrics={metrics}
+          qualityAudit={qualityAudit}
           selectedMetric={selectedMetric}
           onSelectMetric={(id) => setSelectedMetric(selectedMetric === id ? 'all' : id)}
         />
@@ -79,7 +163,7 @@ export const TelemetryPage: React.FC = () => {
         />
 
         {/* Data Quality & Invalidation Guard Panel */}
-        <DataQualityPanel audit={TELEMETRY_QUALITY_AUDIT} />
+        <DataQualityPanel audit={qualityAudit} />
       </div>
     </PageContainer>
   );

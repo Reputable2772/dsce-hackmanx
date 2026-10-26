@@ -3,18 +3,52 @@ import {
   CheckCircle2, 
   XCircle, 
   HelpCircle, 
-  Scale
+  Scale,
+  Loader2
 } from 'lucide-react';
-import { ClaimVerificationRecord } from '../types';
+import { ClaimVerificationRecord, ClaimStatus } from '../types';
 import { PREDEFINED_CLAIMS } from '../fixtures/copilotFixture';
+import { apiClient } from '@/lib/api';
+import { useAppStore } from '@/stores/useAppStore';
 
 export const ClaimVerificationSection: React.FC = () => {
   const [claimInput, setClaimInput] = useState('');
   const [evaluatedResult, setEvaluatedResult] = useState<ClaimVerificationRecord | null>(PREDEFINED_CLAIMS[0]);
+  const [isVerifying, setIsVerifying] = useState(false);
 
-  const handleVerify = (textToVerify: string) => {
+  const connectionState = useAppStore((s) => s.connectionState);
+  const isConnected = connectionState === 'connected';
+
+  const handleVerify = async (textToVerify: string) => {
     const trimmed = textToVerify.trim();
     if (!trimmed) return;
+
+    if (isConnected) {
+      setIsVerifying(true);
+      try {
+        const res = await apiClient.verifyClaim(trimmed);
+        if (res && res.verifications && res.verifications.length > 0) {
+          const v = res.verifications[0];
+          setEvaluatedResult({
+            id: `claim-${Date.now()}`,
+            claimText: v.claim_text || trimmed,
+            metricId: v.metric_id || 'telemetry',
+            claimedValue: String(v.claimed_value),
+            actualValue: v.actual_value !== null && v.actual_value !== undefined ? String(v.actual_value) : null,
+            status: v.status as ClaimStatus,
+            explanation: v.explanation || 'Verified against live engine telemetry buffer.',
+            limitations: 'Calculated against live engine telemetry buffer with ±10% relative tolerance.',
+            evidenceTimestamp: new Date().toLocaleTimeString(),
+          });
+          setIsVerifying(false);
+          return;
+        }
+      } catch {
+        // Fall back gracefully to local matching
+      } finally {
+        setIsVerifying(false);
+      }
+    }
 
     // Check if matching any predefined demonstration claims
     const matched = PREDEFINED_CLAIMS.find(c => 
@@ -33,7 +67,7 @@ export const ClaimVerificationSection: React.FC = () => {
         claimedValue: 'Extracted phrase',
         actualValue: null,
         status: 'UNVERIFIED',
-        explanation: 'UNVERIFIED: This custom claim could not be matched to an active demonstration telemetry fixture. The backend Numerical Claim Verifier is not connected in this frontend preview phase.',
+        explanation: 'UNVERIFIED: No numerical metric assertion detected, or backend verifier is unreachable.',
         limitations: 'Numerical assertion cannot be checked without live telemetry buffer ingestion and statistical tolerance matching.',
         evidenceTimestamp: 'N/A'
       });
@@ -59,8 +93,12 @@ export const ClaimVerificationSection: React.FC = () => {
           </span>
         </div>
 
-        <div className="rounded border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 font-mono text-[10px] text-amber-300">
-          DEMO VERIFICATION — STANDALONE EVIDENCE CHECK
+        <div className={`rounded border px-2.5 py-0.5 font-mono text-[10px] ${
+          isConnected
+            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+            : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+        }`}>
+          {isConnected ? 'LIVE ENGINE VERIFIER (±10% TOLERANCE)' : 'DEMO VERIFICATION — STANDALONE EVIDENCE CHECK'}
         </div>
       </div>
 
@@ -106,11 +144,20 @@ export const ClaimVerificationSection: React.FC = () => {
         />
         <button
           onClick={() => handleVerify(claimInput)}
-          disabled={!claimInput.trim()}
+          disabled={!claimInput.trim() || isVerifying}
           className="flex flex-col items-center justify-center rounded-lg border border-cyan-400/60 bg-cyan-500/20 px-4 text-xs font-mono font-bold text-cyan-200 transition hover:bg-cyan-500/30 disabled:opacity-50"
         >
-          <Scale className="h-4 w-4 mb-0.5" />
-          <span>Check Claim</span>
+          {isVerifying ? (
+            <>
+              <Loader2 className="h-4 w-4 mb-0.5 animate-spin" />
+              <span>Checking...</span>
+            </>
+          ) : (
+            <>
+              <Scale className="h-4 w-4 mb-0.5" />
+              <span>Check Claim</span>
+            </>
+          )}
         </button>
       </div>
 

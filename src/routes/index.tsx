@@ -4,6 +4,7 @@ import { NetworkWorldPage } from '@/features/network-world/NetworkWorldPage';
 import { TelemetryPage } from '@/features/telemetry/TelemetryPage';
 import { PredictionsPage } from '@/features/predictions/PredictionsPage';
 import { IncidentsPage } from '@/features/incidents/IncidentsPage';
+import { HistoryPage } from '@/features/history/HistoryPage';
 import { CopilotPage } from '@/features/copilot/CopilotPage';
 import { SimulationLabPage } from '@/features/simulation/SimulationLabPage';
 import { SystemStatusPage } from '@/features/system-status/SystemStatusPage';
@@ -33,6 +34,10 @@ export const router = createBrowserRouter([
       {
         path: 'incidents',
         element: <IncidentsPage />,
+      },
+      {
+        path: 'history',
+        element: <HistoryPage />,
       },
       {
         path: 'copilot',
