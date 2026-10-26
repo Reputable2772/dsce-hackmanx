@@ -110,3 +110,95 @@ class RunbookMatcher:
 
         scored_matches.sort(key=lambda m: m.relevance_score, reverse=True)
         return scored_matches[:top_k]
+
+    def list_all(self) -> List[Dict[str, Any]]:
+        """Return structured metadata for all bundled runbooks."""
+        if not self.runbooks:
+            self._load_runbooks()
+        return [
+            {
+                "id": rb["filename"].replace(".md", ""),
+                "filename": rb["filename"],
+                "title": rb["title"],
+                "tags": rb["tags"],
+                "target_metrics": rb["target_metrics"],
+                "excerpt": rb["content"][:240].strip() + ("..." if len(rb["content"]) > 240 else ""),
+            }
+            for rb in self.runbooks
+        ]
+
+    def get_by_id(self, runbook_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve full runbook by filename, title or ID."""
+        if not self.runbooks:
+            self._load_runbooks()
+        clean_id = runbook_id.lower().replace(".md", "").strip()
+        for rb in self.runbooks:
+            rb_id = rb["filename"].replace(".md", "").lower()
+            if rb_id == clean_id or rb["title"].lower() == clean_id or clean_id in rb_id:
+                return {
+                    "id": rb["filename"].replace(".md", ""),
+                    "filename": rb["filename"],
+                    "title": rb["title"],
+                    "tags": rb["tags"],
+                    "target_metrics": rb["target_metrics"],
+                    "content": rb["content"],
+                }
+        return None
+
+    def match_text(self, text: str, top_k: int = 2) -> List[RunbookMatch]:
+        """Match runbooks based on arbitrary user query/text keywords and target metrics."""
+        if not self.runbooks:
+            self._load_runbooks()
+
+        scored_matches: List[RunbookMatch] = []
+        words = set(re.findall(r"\w+", text.lower()))
+        
+        metric_keywords = {
+            "latency": "latency_ms",
+            "delay": "latency_ms",
+            "rtt": "latency_ms",
+            "loss": "packet_loss_pct",
+            "drop": "packet_loss_pct",
+            "drops": "drops_in",
+            "jitter": "jitter_ms",
+            "throughput": "throughput_mbps",
+            "bandwidth": "throughput_mbps",
+            "drift": "distribution_drift",
+            "sensor": "sensor_health",
+            "tunnel": "tunnel_health",
+            "bgp": "bgp_session_state",
+            "route": "bgp_session_state",
+            "routing": "bgp_session_state",
+            "congestion": "throughput_mbps",
+            "interface": "carrier_down",
+        }
+        query_metrics = {metric_keywords[w] for w in words if w in metric_keywords}
+
+        for rb in self.runbooks:
+            score = 0.0
+            rb_metrics = set(rb["target_metrics"])
+            rb_tags = set(rb["tags"])
+
+            # Metric matches
+            score += len(query_metrics.intersection(rb_metrics)) * 3.5
+            # Tag matches
+            score += len(words.intersection(rb_tags)) * 2.0
+            # Title words matches
+            title_words = set(re.findall(r"\w+", rb["title"].lower()))
+            score += len(words.intersection(title_words)) * 1.5
+
+            if score > 0.0:
+                scored_matches.append(
+                    RunbookMatch(
+                        filename=rb["filename"],
+                        title=rb["title"],
+                        tags=rb["tags"],
+                        target_metrics=rb["target_metrics"],
+                        relevance_score=score,
+                        content=rb["content"],
+                    )
+                )
+
+        scored_matches.sort(key=lambda m: m.relevance_score, reverse=True)
+        return scored_matches[:top_k]
+

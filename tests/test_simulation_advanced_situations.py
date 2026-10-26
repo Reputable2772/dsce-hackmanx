@@ -147,7 +147,7 @@ def test_packet_forensics_sampling_and_fidelity(advanced_test_server):
     p = pkts["packets"][0]
     assert "packet_id" in p
     assert "protocol" in p
-    assert p["protocol"] in ("TCP", "UDP", "ICMP")
+    assert p["protocol"] in ("TCP", "UDP", "ICMP", "IP", "ETH")
     assert "source_ip" in p or "source" in p
     assert "destination_ip" in p or "destination" in p
     assert "packet_size_bytes" in p

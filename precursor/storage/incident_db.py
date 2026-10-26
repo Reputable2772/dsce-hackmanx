@@ -65,7 +65,7 @@ class IncidentDB:
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             data_dir = os.path.join(base_dir, "data")
             os.makedirs(data_dir, exist_ok=True)
-            self.db_path = os.path.join(data_dir, "precursor.db")
+            self.db_path = os.path.join(data_dir, "incident_db.db")
         else:
             self.db_path = db_path
             os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)

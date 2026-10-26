@@ -159,21 +159,106 @@ export const SystemStatusPage: React.FC = () => {
           ...sub,
           name: 'PRECURSOR REST API Service',
           status: 'AVAILABLE' as SubsystemStatus,
-          notes: `Operational and connected at http://127.0.0.1:8000 (v${backendVersion || '1.0.0'}). Serving /health, /api/status, /api/telemetry, and /api/predictions.`,
+          notes: `Operational and connected at http://127.0.0.1:8000 (v${backendVersion || '1.0.0'}). Serving /health, /ready, /api/status, /api/telemetry, /api/gate, /api/predictions, /api/incidents, /api/evaluation.`,
+        };
+      }
+      if (sub.name === 'Telemetry Collector Daemon') {
+        return {
+          ...sub,
+          name: 'Telemetry Ingestion & Ring Buffer',
+          status: 'AVAILABLE' as SubsystemStatus,
+          notes: 'Active 20,000-point sliding window buffer with automated sensor data-quality auditing (good/stale/missing/invalid).',
         };
       }
       if (sub.name === 'Prediction & Detector Engine') {
         return {
           ...sub,
+          name: 'Multi-Horizon Detector Suite',
           status: 'AVAILABLE' as SubsystemStatus,
-          notes: 'Connected to live PrecursorEngine multi-horizon detectors (5m, 15m, 30m).',
+          notes: 'Connected to live PrecursorEngine detectors (Fixed SLA, EWMA, Forecast Residual, Immediate Hardware Cut) across 5m, 15m, 30m lookaheads.',
         };
       }
       if (sub.name === 'Reliability Gate Engine') {
         return {
           ...sub,
+          name: 'Deterministic Reliability Gate Engine',
           status: 'AVAILABLE' as SubsystemStatus,
-          notes: 'Connected to live Kolmogorov-Smirnov drift gate and residual variance expansion analyzer.',
+          notes: 'Active tri-state controller (PREDICT, DEGRADED, ABSTAIN) with two-sample Kolmogorov-Smirnov drift test and residual variance expansion check.',
+        };
+      }
+      if (sub.name === 'Incident Processing Daemon') {
+        return {
+          ...sub,
+          name: 'Incident Correlator & Lifecycle Manager',
+          status: 'AVAILABLE' as SubsystemStatus,
+          notes: 'Connected to live IncidentGrouper with active hardware fault vs forward early-warning separation and acknowledge/resolve lifecycle support.',
+        };
+      }
+      if (sub.name === 'Local Ollama AI Model (Llama-3 / Mistral)') {
+        return {
+          ...sub,
+          name: 'Offline Diagnostic Copilot Engine',
+          status: 'AVAILABLE' as SubsystemStatus,
+          notes: 'Local-first offline diagnostic engine with Ollama runtime auto-detection and deterministic heuristic fallback.',
+        };
+      }
+      if (sub.name === 'Runbook Vector Search / RAG') {
+        return {
+          ...sub,
+          name: 'Bundled Runbook Matcher Engine',
+          status: 'AVAILABLE' as SubsystemStatus,
+          notes: 'Deterministic keyword and incident tag matcher over bundled Markdown operational runbooks.',
+        };
+      }
+      if (sub.name === 'Backend Numerical Claim Verifier') {
+        return {
+          ...sub,
+          name: 'Numerical Claim Verifier Service',
+          status: 'AVAILABLE' as SubsystemStatus,
+          notes: 'Deterministic ground-truth verifier validating numerical assertions against telemetry buffer within ±10% tolerance band.',
+        };
+      }
+      if (sub.name === 'Persistent Telemetry & Run Storage') {
+        return {
+          ...sub,
+          name: 'Local Run Archive & Storage Manager',
+          status: 'AVAILABLE' as SubsystemStatus,
+          notes: 'Operating on local filesystem (data/runs/ and data/exports/) producing structured JSON run archives and tabular CSV exports.',
+        };
+      }
+      if (sub.name === 'Telemetry Explorer UI') {
+        return {
+          ...sub,
+          status: 'AVAILABLE' as SubsystemStatus,
+          notes: 'Connected to live 5-second telemetry buffer on backend port 8000 with real sensor quality audit.',
+        };
+      }
+      if (sub.name === 'Predictions & Early Warning Views') {
+        return {
+          ...sub,
+          status: 'AVAILABLE' as SubsystemStatus,
+          notes: 'Connected to live detector results and Reliability Gate decisions from backend REST API.',
+        };
+      }
+      if (sub.name === 'Incident Management & Runbooks') {
+        return {
+          ...sub,
+          status: 'AVAILABLE' as SubsystemStatus,
+          notes: 'Connected to live IncidentGrouper and acknowledge/resolve lifecycle endpoints.',
+        };
+      }
+      if (sub.name === 'AI Copilot & Claim Verifier') {
+        return {
+          ...sub,
+          status: 'AVAILABLE' as SubsystemStatus,
+          notes: 'Connected to live POST /api/copilot/query and POST /api/claims/verify endpoints.',
+        };
+      }
+      if (sub.name === 'Simulation Lab & Evaluation') {
+        return {
+          ...sub,
+          status: 'AVAILABLE' as SubsystemStatus,
+          notes: 'Connected to live PairedBenchmarkRunner executing GATE ON vs GATE OFF evaluation.',
         };
       }
     }

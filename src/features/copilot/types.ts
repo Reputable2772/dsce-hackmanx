@@ -56,7 +56,7 @@ export interface ChatMessage {
   timestamp: string;
   text: string;
   structuredResponse?: CopilotStructuredResponse;
-  isDemo: true;
+  isDemo: boolean;
 }
 
 export interface SuggestedPrompt {

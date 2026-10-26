@@ -42,6 +42,7 @@ from precursor.storage import (
 )
 from precursor.storage.incident_db import IncidentDB
 from precursor.storage.system_registry import SystemRegistry
+from precursor.storage.database import DatabaseManager
 
 
 class SystemSnapshot(BaseModel):
@@ -90,6 +91,7 @@ class PrecursorEngine:
         self.storage_manager = RunStorageManager()
         self.incident_db = IncidentDB()
         self.system_registry = SystemRegistry()
+        self.db = DatabaseManager()
 
         # Asynchronous background LLM executor (Solution 1)
         self._llm_executor = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="precursor-llm")
@@ -98,6 +100,8 @@ class PrecursorEngine:
         # Ingestion Mode: "synthetic" (default) or "live"
         self.mode: str = "synthetic"
         self.live_collector: Optional[LiveTelemetryCollector] = None
+        self.incident_states: Dict[str, str] = {}
+        self.saved_evaluations: List[Dict[str, Any]] = []
 
     def set_mode(
         self,
@@ -151,6 +155,7 @@ class PrecursorEngine:
             self.live_collector = LiveTelemetryCollector(interface_id=self.interface_id)
         batch = self.live_collector.collect()
         self.buffer.add_batch(batch.points)
+        self.db.record_telemetry_batch(batch.points, source=self.mode)
         return self._evaluate_pipeline(batch.timestamp)
 
     def reset_scenario(self, scenario_type: ScenarioType, seed: int = 42):
@@ -179,6 +184,7 @@ class PrecursorEngine:
                     status="healthy" if (hasattr(pt.quality, "value") and pt.quality.value == "good") or pt.quality == "good" else "degraded",
                     metrics={pt.metric_id: pt.value},
                 )
+        self.db.record_telemetry_batch(points, source=self.mode)
         t_now = self.buffer.get_latest_timestamp() or self.config.start_timestamp
         return self._evaluate_pipeline(t_now)
 
@@ -188,6 +194,7 @@ class PrecursorEngine:
             return self.step_live()
         batch = self.generator.step()
         self.buffer.add_batch(batch.points)
+        self.db.record_telemetry_batch(batch.points, source=self.mode)
         return self._evaluate_pipeline(batch.timestamp)
 
     def fast_forward(self, seconds: float = 600.0) -> SystemSnapshot:
@@ -196,6 +203,7 @@ class PrecursorEngine:
         for _ in range(steps):
             batch = self.generator.step()
             self.buffer.add_batch(batch.points)
+            self.db.record_telemetry_batch(batch.points, source=self.mode)
         t_now = self.buffer.get_latest_timestamp()
         return self._evaluate_pipeline(t_now)
 
@@ -206,9 +214,17 @@ class PrecursorEngine:
 
         # 2. Reliability Gate
         gate_decision = self.gate.evaluate(self.buffer, current_time)
+        self.db.record_gate_decision(gate_decision, current_time, source=self.mode)
 
         # 3. Incident Grouping
         incidents = self.grouper.group(results_by_h, gate_decision, current_time, interface_id=self.interface_id)
+        for inc in incidents:
+            if inc.id in getattr(self, "incident_states", {}):
+                inc.status = self.incident_states[inc.id]
+            inc_dict = inc.model_dump()
+            inc_dict["scenario_type"] = self.scenario_type.value if hasattr(self, "scenario_type") else None
+            inc_dict["seed"] = getattr(self, "seed", None)
+            self.db.upsert_incident(inc_dict, source=self.mode)
 
         # 4. Telemetry Snapshot
         latest_telem: Dict[str, Optional[float]] = {}
@@ -221,7 +237,7 @@ class PrecursorEngine:
 
         quality_stats = self.buffer.quality_stats(window_seconds=300.0, current_time=current_time)
 
-        # 5. Copilot guidance for the highest severity active incident
+        # 5. Copilot guidance: NOT generated automatically on every step. Strictly user-triggered!
         copilot_response = None
         if incidents:
             top_incident = sorted(incidents, key=lambda i: (i.severity == "CRITICAL", not i.is_active_fault), reverse=True)[0]
@@ -334,6 +350,68 @@ class PrecursorEngine:
         if len(self.snapshot_history) > 1000:
             self.snapshot_history.pop(0)
         return snapshot
+
+    def explain_incident(self, incident_id: str, prompt: Optional[str] = None) -> Dict[str, Any]:
+        """User-triggered: explain a specific incident and provide runbook guidance."""
+        inc_obj = None
+        if self.last_snapshot:
+            match = next((i for i in self.last_snapshot.incidents if i.id == incident_id), None)
+            if match:
+                inc_obj = match
+        if not inc_obj:
+            db_inc = self.db.get_incident(incident_id)
+            if db_inc:
+                try:
+                    inc_obj = Incident(**db_inc)
+                except Exception:
+                    pass
+
+        telemetry = self.last_snapshot.latest_telemetry if self.last_snapshot else {}
+        matches = self.matcher.match(inc_obj, top_k=2) if inc_obj else []
+
+        if prompt:
+            copilot_resp = self.copilot.query(prompt=prompt, telemetry_snapshot=telemetry, incident=inc_obj)
+        else:
+            copilot_resp = self.copilot.explain_and_recommend(inc_obj, telemetry, matches)
+
+        resp_dict = copilot_resp.model_dump()
+
+        # Run claim verification on assertions made
+        claims_to_verify = []
+        if hasattr(copilot_resp, "claims") and copilot_resp.claims:
+            for c in copilot_resp.claims:
+                claims_to_verify.append(c.claim_text if hasattr(c, "claim_text") else str(c))
+        elif hasattr(copilot_resp, "summary") and copilot_resp.summary:
+            claims_to_verify.append(copilot_resp.summary)
+
+        verified_results = []
+        for statement in claims_to_verify:
+            verifications = self.copilot.verifier.verify_response(statement, telemetry)
+            for v in verifications:
+                v_dict = v.model_dump()
+                verified_results.append(v_dict)
+                self.db.record_claim_verification(
+                    statement=v.claim_text,
+                    verdict=v.status.value if hasattr(v.status, "value") else str(v.status),
+                    metric_id=v.metric_id,
+                    claimed_value=v.claimed_value,
+                    observed_value=v.actual_value,
+                    tolerance_pct=getattr(v, "tolerance_pct", 5.0),
+                    explanation=v.explanation,
+                    incident_id=incident_id,
+                )
+        resp_dict["claim_verifications"] = verified_results
+
+        # Record query and response to DB
+        query_prompt = prompt or f"Explain incident {incident_id}: {inc_obj.title if inc_obj else ''}"
+        self.db.record_copilot_query(
+            prompt=query_prompt,
+            response_dict=resp_dict,
+            incident_id=incident_id,
+            source=getattr(self, "mode", "synthetic"),
+        )
+        return resp_dict
+
 
     def run_paired_evaluation(self, scenario_type: ScenarioType, seed: int = 42) -> ScenarioComparisonResult:
         """Run paired comparison GATE ON vs GATE OFF on the requested scenario."""

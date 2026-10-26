@@ -1,8 +1,10 @@
 import React from 'react';
-import { Hash, Clock, Percent, Shield, Play, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Hash, Clock, Percent, Shield, Play, RotateCcw, AlertTriangle, Radio } from 'lucide-react';
 import { useSimulationStore } from '../useSimulationStore';
+import { useAppStore } from '@/stores/useAppStore';
 
 export const SimulationConfigPanel: React.FC = () => {
+  const isConnected = useAppStore((s) => s.connectionState) === 'connected';
   const {
     config,
     phase,
@@ -19,9 +21,16 @@ export const SimulationConfigPanel: React.FC = () => {
     <div className="rounded-xl border border-precursor-border bg-precursor-card/60 p-5 backdrop-blur-sm">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-sm font-bold text-white">Scenario Configuration</h3>
-        <span className="rounded border border-precursor-border bg-precursor-surface px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-precursor-lavender">
-          Frontend Only
-        </span>
+        {isConnected ? (
+          <span className="inline-flex items-center gap-1 rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-emerald-400">
+            <Radio className="h-2.5 w-2.5 animate-pulse text-emerald-400" />
+            <span>Python Benchmark Engine</span>
+          </span>
+        ) : (
+          <span className="rounded border border-slate-700 bg-slate-800 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-slate-400">
+            Deterministic Fixtures
+          </span>
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

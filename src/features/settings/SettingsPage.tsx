@@ -11,7 +11,13 @@ import {
 import { PageContainer } from '@/components/layout/PageContainer';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 
+import { useAppStore } from '@/stores/useAppStore';
+import { apiClient } from '@/lib/api';
+
 export const SettingsPage: React.FC = () => {
+  const connectionState = useAppStore((s) => s.connectionState);
+  const isConnected = connectionState === 'connected';
+
   const {
     theme,
     reducedMotion,
@@ -36,6 +42,13 @@ export const SettingsPage: React.FC = () => {
   const [exportNotice, setExportNotice] = useState<string | null>(null);
 
   const handleExportDemoCsv = () => {
+    if (isConnected) {
+      window.open(apiClient.getExportCsvUrl(), '_blank');
+      setExportNotice('Live telemetry CSV exported directly from backend storage vault.');
+      setTimeout(() => setExportNotice(null), 4000);
+      return;
+    }
+
     // Generates a sample CSV following Agent C's agreed schema
     const headers = 'timestamp_iso,timestamp_epoch,node_id,interface_id,metric_id,value,unit,quality,source,labels_json\n';
     const sampleRow = `${new Date().toISOString()},${Date.now()},spine-01,eth0,rtt_ms,14.2,ms,good,demo_fixture,"{""role"":""spine""}"\n`;
@@ -51,6 +64,12 @@ export const SettingsPage: React.FC = () => {
   };
 
   const handleExportDemoJson = () => {
+    if (isConnected) {
+      window.open(apiClient.getExportJsonUrl(), '_blank');
+      setExportNotice('Live structured JSON run archive exported directly from backend storage vault.');
+      setTimeout(() => setExportNotice(null), 4000);
+      return;
+    }
     // Generates a sample structured run archive JSON following Agent C's agreed schema
     const archive = {
       version: '1.0.0',

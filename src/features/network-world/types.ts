@@ -14,12 +14,12 @@ export interface TopologyNodeMetadata {
 }
 
 export interface TopologyNodeMetrics {
-  latencyMs?: number;
-  jitterMs?: number;
-  packetLossPct?: number;
-  throughputMbps?: number;
-  cpuUtilizationPct?: number;
-  memoryUtilizationPct?: number;
+  latencyMs?: number | null;
+  jitterMs?: number | null;
+  packetLossPct?: number | null;
+  throughputMbps?: number | null;
+  cpuUtilizationPct?: number | null;
+  memoryUtilizationPct?: number | null;
 }
 
 export interface TopologyNodeData {
@@ -55,6 +55,10 @@ export interface NetworkTopologyData {
   name: string;
   description: string;
   isDemoFixture: boolean;
+  mode?: string;
+  view?: string;
+  gate_state?: string;
+  timestamp?: number;
   nodes: TopologyNodeData[];
   links: TopologyLinkData[];
 }

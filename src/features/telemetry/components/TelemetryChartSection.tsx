@@ -29,14 +29,14 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     const quality = pt?.quality || 'good';
 
     return (
-      <div className="rounded-xl border border-white/[0.1] bg-precursor-card-glass p-3 font-mono text-xs shadow-glass-panel backdrop-blur-2xl">
-        <div className="flex items-center justify-between gap-3 border-b border-white/[0.08] pb-1.5 text-slate-400">
-          <span>Time: <strong className="text-white font-bold">{label}</strong></span>
-          <span className={`rounded-md px-1.5 py-0.5 text-[10px] uppercase font-bold ${
-            quality === 'good' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
-            quality === 'stale' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
-            quality === 'missing' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' :
-            'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+      <div className="rounded-xl border border-[#E3E8F0] bg-white p-3 font-mono text-xs shadow-md">
+        <div className="flex items-center justify-between gap-3 border-b border-[#E3E8F0] pb-1.5 text-[#687386]">
+          <span>Time: <strong className="text-[#202938] font-bold">{label}</strong></span>
+          <span className={`rounded-md px-1.5 py-0.5 text-[10px] uppercase font-bold border ${
+            quality === 'good' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+            quality === 'stale' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+            quality === 'missing' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+            'bg-indigo-50 text-indigo-700 border-indigo-200'
           }`}>
             {quality}
           </span>
@@ -45,20 +45,20 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         <div className="mt-2 space-y-1">
           {payload.map((entry: any, index: number) => (
             <div key={`item-${index}`} className="flex items-center justify-between gap-4">
-              <span className="flex items-center gap-1.5" style={{ color: entry.color }}>
+              <span className="flex items-center gap-1.5 font-medium" style={{ color: entry.color }}>
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
                 <span>{entry.name}:</span>
               </span>
-              <span className="font-bold text-white">
-                {entry.value !== null && entry.value !== undefined ? entry.value : <span className="text-rose-400 italic">NULL (Missing)</span>}
+              <span className="font-bold text-[#202938]">
+                {entry.value !== null && entry.value !== undefined ? entry.value : <span className="text-rose-600 italic">NULL (Missing)</span>}
               </span>
             </div>
           ))}
         </div>
 
         {pt?.isEventWindow && (
-          <div className="mt-2 flex items-center gap-1.5 border-t border-white/[0.06] pt-1.5 text-[10px] text-amber-400">
-            <AlertTriangle className="h-3.5 w-3.5" />
+          <div className="mt-2 flex items-center gap-1.5 border-t border-[#E3E8F0] pt-1.5 text-[10px] text-amber-700 font-semibold">
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
             <span>Event window: Contention & Buffer Saturation</span>
           </div>
         )}
@@ -159,20 +159,20 @@ export const TelemetryChartSection: React.FC<TelemetryChartSectionProps> = ({
             <div className="h-80 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2254" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
                   
                   <XAxis 
                     dataKey="timeLabel" 
-                    stroke="#64748b" 
-                    tick={{ fill: '#94a3b8', fontSize: 11 }}
-                    tickLine={{ stroke: '#475569' }}
+                    stroke="#CBD5E1" 
+                    tick={{ fill: '#64748B', fontSize: 11 }}
+                    tickLine={{ stroke: '#E2E8F0' }}
                     interval={5}
                   />
                   
                   <YAxis 
                     yAxisId="left"
-                    stroke="#48ddf5" 
-                    tick={{ fill: '#48ddf5', fontSize: 11 }}
+                    stroke="#5267D8" 
+                    tick={{ fill: '#5267D8', fontSize: 11 }}
                     domain={[10, 60]}
                     unit="ms"
                   />
@@ -180,8 +180,8 @@ export const TelemetryChartSection: React.FC<TelemetryChartSectionProps> = ({
                   <YAxis 
                     yAxisId="right"
                     orientation="right"
-                    stroke="#f43f5e" 
-                    tick={{ fill: '#f43f5e', fontSize: 11 }}
+                    stroke="#DC2626" 
+                    tick={{ fill: '#DC2626', fontSize: 11 }}
                     domain={[0, 3.0]}
                     unit="%"
                   />
@@ -194,23 +194,23 @@ export const TelemetryChartSection: React.FC<TelemetryChartSectionProps> = ({
                       <ReferenceLine 
                         yAxisId="left" 
                         y={35.0} 
-                        stroke="#f59e0b" 
+                        stroke="#D97706" 
                         strokeDasharray="4 4" 
-                        label={{ value: 'SLA Warning 35ms', fill: '#f59e0b', fontSize: 10, position: 'insideTopLeft' }} 
+                        label={{ value: 'SLA Warning 35ms', fill: '#B45309', fontSize: 10, position: 'insideTopLeft' }} 
                       />
                       <ReferenceLine 
                         yAxisId="left" 
                         y={50.0} 
-                        stroke="#f43f5e" 
+                        stroke="#DC2626" 
                         strokeDasharray="4 4" 
-                        label={{ value: 'Critical SLA 50ms', fill: '#f43f5e', fontSize: 10, position: 'insideTopLeft' }} 
+                        label={{ value: 'Critical SLA 50ms', fill: '#DC2626', fontSize: 10, position: 'insideTopLeft' }} 
                       />
                       <ReferenceLine 
                         yAxisId="right" 
                         y={2.0} 
-                        stroke="#e11d48" 
+                        stroke="#DC2626" 
                         strokeDasharray="3 3" 
-                        label={{ value: 'Loss Breach 2.0%', fill: '#e11d48', fontSize: 10, position: 'insideTopRight' }} 
+                        label={{ value: 'Loss Breach 2.0%', fill: '#DC2626', fontSize: 10, position: 'insideTopRight' }} 
                       />
                     </>
                   )}
@@ -221,9 +221,9 @@ export const TelemetryChartSection: React.FC<TelemetryChartSectionProps> = ({
                       yAxisId="left"
                       x1="14:02:00"
                       x2="14:03:45"
-                      fill="#9b7bff"
-                      fillOpacity={0.08}
-                      stroke="#9b7bff"
+                      fill="#EEF2FF"
+                      fillOpacity={0.6}
+                      stroke="#5267D8"
                       strokeDasharray="3 3"
                     />
                   )}
@@ -233,10 +233,10 @@ export const TelemetryChartSection: React.FC<TelemetryChartSectionProps> = ({
                     type="monotone"
                     dataKey="rtt_ms"
                     name="Latency"
-                    stroke="#48ddf5"
+                    stroke="#5267D8"
                     strokeWidth={2.5}
                     dot={false}
-                    activeDot={{ r: 5, fill: '#48ddf5', stroke: '#111323', strokeWidth: 2 }}
+                    activeDot={{ r: 5, fill: '#5267D8', stroke: '#FFFFFF', strokeWidth: 2 }}
                     connectNulls={false} // Preserves missing value gaps
                   />
 
@@ -245,10 +245,10 @@ export const TelemetryChartSection: React.FC<TelemetryChartSectionProps> = ({
                     type="monotone"
                     dataKey="packet_loss_pct"
                     name="Packet Loss"
-                    stroke="#f43f5e"
+                    stroke="#DC2626"
                     strokeWidth={2}
                     dot={false}
-                    activeDot={{ r: 5, fill: '#f43f5e', stroke: '#111323', strokeWidth: 2 }}
+                    activeDot={{ r: 5, fill: '#DC2626', stroke: '#FFFFFF', strokeWidth: 2 }}
                     connectNulls={false}
                   />
                 </LineChart>
@@ -279,19 +279,19 @@ export const TelemetryChartSection: React.FC<TelemetryChartSectionProps> = ({
                     </linearGradient>
                   </defs>
                   
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2254" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
                   
                   <XAxis 
                     dataKey="timeLabel" 
-                    stroke="#64748b" 
-                    tick={{ fill: '#94a3b8', fontSize: 11 }}
+                    stroke="#CBD5E1" 
+                    tick={{ fill: '#64748B', fontSize: 11 }}
                     interval={5}
                   />
                   
                   <YAxis 
                     yAxisId="left"
-                    stroke="#45d6b5" 
-                    tick={{ fill: '#45d6b5', fontSize: 11 }}
+                    stroke="#159E98" 
+                    tick={{ fill: '#159E98', fontSize: 11 }}
                     domain={[400, 1100]}
                     unit="M"
                   />
@@ -299,8 +299,8 @@ export const TelemetryChartSection: React.FC<TelemetryChartSectionProps> = ({
                   <YAxis 
                     yAxisId="right"
                     orientation="right"
-                    stroke="#f59e0b" 
-                    tick={{ fill: '#f59e0b', fontSize: 11 }}
+                    stroke="#D97706" 
+                    tick={{ fill: '#D97706', fontSize: 11 }}
                     domain={[0, 20]}
                     unit="p/s"
                   />
@@ -311,9 +311,9 @@ export const TelemetryChartSection: React.FC<TelemetryChartSectionProps> = ({
                     <ReferenceLine 
                       yAxisId="right" 
                       y={10} 
-                      stroke="#f59e0b" 
+                      stroke="#D97706" 
                       strokeDasharray="4 4" 
-                      label={{ value: 'Drop Warning 10 pkts/s', fill: '#f59e0b', fontSize: 10, position: 'insideTopRight' }} 
+                      label={{ value: 'Drop Warning 10 pkts/s', fill: '#B45309', fontSize: 10, position: 'insideTopRight' }} 
                     />
                   )}
 
@@ -322,10 +322,10 @@ export const TelemetryChartSection: React.FC<TelemetryChartSectionProps> = ({
                     type="monotone"
                     dataKey="throughput_mbps"
                     name="Throughput"
-                    stroke="#45d6b5"
+                    stroke="#159E98"
                     strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#colorThroughput)"
+                    fillOpacity={0.2}
+                    fill="#159E98"
                     connectNulls={false}
                   />
 
@@ -334,7 +334,7 @@ export const TelemetryChartSection: React.FC<TelemetryChartSectionProps> = ({
                     type="stepAfter"
                     dataKey="interface_errors"
                     name="Interface Drops"
-                    stroke="#f59e0b"
+                    stroke="#D97706"
                     strokeWidth={2}
                     dot={false}
                     connectNulls={false}

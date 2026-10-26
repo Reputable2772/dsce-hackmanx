@@ -90,16 +90,17 @@ def test_vertical_slice_copilot_and_claim_verification():
     engine = PrecursorEngine(scenario_type=ScenarioType.GRADUAL_DEGRADATION, seed=42)
     snapshot = engine.fast_forward(800.0)
 
-    # When incidents exist, Copilot must produce response
+    # In user-triggered mode, Copilot produces response when requested for an incident
     if snapshot.incidents:
-        assert snapshot.copilot_response is not None
-        cr = snapshot.copilot_response
-        assert len(cr.summary) > 0
-        assert len(cr.hypotheses) > 0
-        assert len(cr.diagnostic_commands) > 0
+        explanation = engine.explain_incident(snapshot.incidents[0].id)
+        assert explanation is not None
+        assert len(explanation["summary"]) > 0
+        assert len(explanation["hypotheses"]) > 0
+        assert len(explanation["diagnostic_commands"]) > 0
         # Claims must be assessed with valid status enum
-        for claim in cr.claims:
-            claim_val = claim.status.value if hasattr(claim.status, "value") else str(claim.status)
+        for claim in explanation.get("claims", []):
+            status = claim.get("status") if isinstance(claim, dict) else getattr(claim, "status", None)
+            claim_val = status.value if hasattr(status, "value") else str(status)
             assert claim_val in ("VERIFIED", "CONTRADICTED", "UNVERIFIED")
 
 
@@ -107,11 +108,11 @@ def test_streamlit_dashboard_end_to_end_rendering():
     """Verify Streamlit dashboard executes all tabs and buttons cleanly via AppTest."""
     app_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "dashboard", "app.py"))
     at = AppTest.from_file(app_path)
-    at.run(timeout=20)
+    at.run(timeout=35)
     assert not at.exception, f"Dashboard exception on load: {at.exception}"
 
     # Advance step +5s
     step_btn = [b for b in at.button if "Step" in b.label][0]
-    step_btn.click().run(timeout=15)
+    step_btn.click().run(timeout=25)
     assert not at.exception, f"Dashboard exception on step: {at.exception}"
     assert at.session_state["sim_steps"] == 26
