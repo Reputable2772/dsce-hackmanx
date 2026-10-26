@@ -88,6 +88,17 @@ export const IncidentList: React.FC<IncidentListProps> = ({
                   </span>
                 )}
 
+                {inc.source === 'live' ? (
+                  <span className="flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-300 px-1.5 py-0.2 text-[9px] font-mono font-bold text-emerald-800">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                    <span>LIVE</span>
+                  </span>
+                ) : (
+                  <span className="rounded bg-indigo-50 border border-indigo-100 px-1.5 py-0.2 text-[9px] font-mono font-medium text-[#5267D8]">
+                    SYNTHETIC
+                  </span>
+                )}
+
                 {inc.isActiveFault && (
                   <span className="flex items-center gap-1 rounded-full bg-rose-50 border border-rose-200 px-1.5 py-0.2 text-[9px] font-mono font-semibold text-rose-700">
                     <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />

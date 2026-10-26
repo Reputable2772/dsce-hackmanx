@@ -66,6 +66,7 @@ export interface IncidentRecord {
   lastObserved: string;
   isActiveFault: boolean;
   predictedHorizonMinutes: number | null;
+  source?: 'synthetic' | 'live';
   evidence: IncidentEvidenceItem[];
   timeline: IncidentTimelineEvent[];
   currentFaults: Array<{ id: string; rule: string; interfaceId: string; value: string }>;

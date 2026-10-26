@@ -22,6 +22,7 @@ export const IncidentsPage: React.FC = () => {
   const [selectedSeverity, setSelectedSeverity] = useState<IncidentSeverity | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<IncidentStatus | 'ALL'>('ALL');
   const [selectedCategory, setSelectedCategory] = useState<IncidentCategory | 'ALL'>('ALL');
+  const [selectedSource, setSelectedSource] = useState<'ALL' | 'SYNTHETIC' | 'LIVE'>('ALL');
   const [selectedNode, setSelectedNode] = useState<string>('ALL');
   const [sortBy, setSortBy] = useState<'RECENT' | 'SEVERITY'>('RECENT');
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -93,6 +94,15 @@ export const IncidentsPage: React.FC = () => {
           return false;
         }
 
+        // Source filter (Live vs Synthetic)
+        if (selectedSource !== 'ALL') {
+          const matchSource = selectedSource.toLowerCase();
+          const incSource = (inc.source || 'synthetic').toLowerCase();
+          if (incSource !== matchSource) {
+            return false;
+          }
+        }
+
         // Node filter
         if (selectedNode !== 'ALL') {
           if (!Array.isArray(inc.affectedNodes) || !inc.affectedNodes.includes(selectedNode)) {
@@ -115,7 +125,7 @@ export const IncidentsPage: React.FC = () => {
         // Recent sort: chronological or reverse ID
         return b.id.localeCompare(a.id);
       });
-  }, [incidentsList, searchQuery, selectedSeverity, selectedStatus, selectedCategory, selectedNode, sortBy]);
+  }, [incidentsList, searchQuery, selectedSeverity, selectedStatus, selectedCategory, selectedSource, selectedNode, sortBy]);
 
   const selectedIncident = useMemo(() => {
     if (selectedIncidentId) {
@@ -130,6 +140,7 @@ export const IncidentsPage: React.FC = () => {
     setSelectedSeverity('ALL');
     setSelectedStatus('ALL');
     setSelectedCategory('ALL');
+    setSelectedSource('ALL');
     setSelectedNode('ALL');
     setSortBy('RECENT');
   };
@@ -171,6 +182,8 @@ export const IncidentsPage: React.FC = () => {
           onStatusChange={setSelectedStatus}
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
+          selectedSource={selectedSource}
+          onSourceChange={setSelectedSource}
           selectedNode={selectedNode}
           onNodeChange={setSelectedNode}
           availableNodes={availableNodes}

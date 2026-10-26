@@ -48,6 +48,10 @@ export const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({
 
   const isLocalHost = selectedNode?.id === 'local-host';
   const isPeerNode = isPeerTopology || (selectedNode?.type === 'endpoint' && selectedNode.metadata.role?.includes('Peer'));
+  const isLiveTarget =
+    Boolean(selectedNode?.id?.startsWith('target-')) ||
+    selectedNode?.metadata?.role === 'Live Probe Target' ||
+    Boolean(selectedNode?.name?.toLowerCase().includes('probe target'));
 
   const handleTriggerProbe = async () => {
     if (!selectedNode || isLocalHost) return;
@@ -140,7 +144,12 @@ export const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({
               <span>ID: <span className="text-[#5267D8] font-semibold">{selectedNode.id}</span></span>
               <span>•</span>
               <span className="inline-flex items-center gap-1">
-                {isLocalHost ? (
+                {isLiveTarget ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-mono font-bold text-emerald-800 shadow-xs animate-pulse">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
+                    LIVE TARGET
+                  </span>
+                ) : isLocalHost ? (
                   <span className="rounded bg-indigo-50 text-[#5267D8] px-1.5 py-0.5 text-[10px] font-semibold">
                     LOCAL HOST
                   </span>
@@ -154,6 +163,29 @@ export const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({
               </span>
             </div>
           </div>
+
+          {/* Highlight for Live Probe Target */}
+          {isLiveTarget && (
+            <div className="rounded-xl border border-emerald-300 bg-emerald-50/70 p-3 text-xs text-emerald-950 shadow-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-bold text-emerald-900">
+                  <Radio className="h-4 w-4 text-emerald-600 animate-pulse" />
+                  <span>Real-Time Live Socket Target</span>
+                </div>
+                <span className="font-mono text-[10px] uppercase font-bold text-emerald-700 bg-emerald-100/90 border border-emerald-200 px-2 py-0.5 rounded-full">
+                  Target Probed
+                </span>
+              </div>
+              <div className="mt-2.5 flex items-baseline justify-between border-t border-emerald-200/80 pt-2 font-mono">
+                <span className="text-[11px] text-emerald-800">Probe Round-Trip Latency:</span>
+                <span className="text-base font-bold text-emerald-900">
+                  {selectedNode.metrics.latencyMs !== null && selectedNode.metrics.latencyMs !== undefined
+                    ? `${selectedNode.metrics.latencyMs.toFixed(1)} ms`
+                    : 'Awaiting Next 5s Probe...'}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Location & Metadata Details */}
           <div className="rounded-xl border border-[#E3E8F0] bg-[#F6F8FB] p-3 text-xs space-y-2">

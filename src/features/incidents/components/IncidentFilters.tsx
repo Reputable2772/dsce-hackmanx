@@ -12,6 +12,8 @@ interface IncidentFiltersProps {
   onStatusChange: (st: IncidentStatus | 'ALL') => void;
   selectedCategory: IncidentCategory | 'ALL';
   onCategoryChange: (c: IncidentCategory | 'ALL') => void;
+  selectedSource: 'ALL' | 'SYNTHETIC' | 'LIVE';
+  onSourceChange: (source: 'ALL' | 'SYNTHETIC' | 'LIVE') => void;
   selectedNode: string;
   onNodeChange: (node: string) => void;
   availableNodes: string[];
@@ -32,6 +34,8 @@ export const IncidentFilters: React.FC<IncidentFiltersProps> = ({
   onStatusChange,
   selectedCategory,
   onCategoryChange,
+  selectedSource,
+  onSourceChange,
   selectedNode,
   onNodeChange,
   availableNodes,
@@ -81,6 +85,7 @@ export const IncidentFilters: React.FC<IncidentFiltersProps> = ({
     selectedSeverity !== 'ALL' ||
     selectedStatus !== 'ALL' ||
     selectedCategory !== 'ALL' ||
+    selectedSource !== 'ALL' ||
     selectedNode !== 'ALL' ||
     sortBy !== 'RECENT';
 
@@ -101,6 +106,18 @@ export const IncidentFilters: React.FC<IncidentFiltersProps> = ({
 
         {/* Dropdown Filters */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Telemetry Source (Live vs Synthetic) */}
+          <select
+            value={selectedSource}
+            onChange={(e) => onSourceChange(e.target.value as 'ALL' | 'SYNTHETIC' | 'LIVE')}
+            aria-label="Filter incidents by telemetry source"
+            className="rounded-lg border border-[#CBD5E1] bg-[#F6F8FB] px-2.5 py-1.5 text-xs font-semibold text-[#202938] outline-none transition hover:border-[#5267D8] focus:border-[#5267D8]"
+          >
+            <option value="ALL">All Sources (Live & Syn)</option>
+            <option value="LIVE">Live Hardware Traffic</option>
+            <option value="SYNTHETIC">Synthetic Scenarios</option>
+          </select>
+
           {/* Severity */}
           <select
             value={selectedSeverity}
