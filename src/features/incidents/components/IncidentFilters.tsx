@@ -30,7 +30,7 @@ export const IncidentFilters: React.FC<IncidentFiltersProps> = ({
   onReset
 }) => {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-violet-900/40 bg-navy-900/60 p-3.5 backdrop-blur-md">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-precursor-card-glass p-3 backdrop-blur-xl shadow-glass-panel">
       {/* Search Bar */}
       <div className="relative min-w-[220px] flex-1">
         <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
@@ -39,7 +39,7 @@ export const IncidentFilters: React.FC<IncidentFiltersProps> = ({
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search incidents by ID, node, or summary..."
-          className="w-full rounded-lg border border-violet-800/60 bg-navy-950 py-1.5 pl-9 pr-3 text-xs text-slate-200 placeholder-slate-400 outline-none transition focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50"
+          className="w-full rounded-lg border border-white/[0.1] bg-precursor-surface py-1.5 pl-9 pr-3 text-xs text-slate-200 placeholder-slate-400 outline-none transition focus:border-precursor-cyan focus:ring-1 focus:ring-precursor-cyan"
         />
       </div>
 

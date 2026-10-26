@@ -58,9 +58,9 @@ export const IncidentDetailPanel: React.FC<IncidentDetailPanelProps> = ({
   };
 
   return (
-    <div className="space-y-4 rounded-xl border border-violet-900/50 bg-navy-900/80 p-5 backdrop-blur-md">
+    <div className="space-y-4 rounded-2xl border border-white/[0.08] bg-precursor-card-glass p-5 backdrop-blur-xl shadow-glass-panel">
       {/* Top Banner: ID, Status, Severity */}
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-violet-900/40 pb-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/[0.08] pb-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="font-mono text-sm font-bold text-cyan-400">

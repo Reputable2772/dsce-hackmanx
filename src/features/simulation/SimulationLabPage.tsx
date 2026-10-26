@@ -34,7 +34,7 @@ export const SimulationLabPage: React.FC = () => {
       }
     >
       {/* Tab Navigation */}
-      <div className="mb-6 flex gap-1 rounded-xl border border-precursor-border bg-precursor-surface/40 p-1">
+      <div className="mb-6 flex gap-1 rounded-xl border border-white/[0.08] bg-precursor-card-glass p-1.5 backdrop-blur-xl shadow-glass-panel">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -43,9 +43,9 @@ export const SimulationLabPage: React.FC = () => {
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-semibold transition-all sm:flex-initial ${
+              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-mono font-bold transition-all sm:flex-initial ${
                 isActive
-                  ? 'bg-precursor-violet/50 text-white shadow-glow-purple/10'
+                  ? 'border border-precursor-purple/40 bg-precursor-violet/60 text-white shadow-glow-purple/20'
                   : 'text-slate-400 hover:bg-precursor-surface/60 hover:text-slate-200'
               }`}
             >

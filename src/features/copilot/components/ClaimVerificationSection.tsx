@@ -46,21 +46,21 @@ export const ClaimVerificationSection: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4 rounded-xl border border-violet-900/40 bg-navy-900/60 p-4 backdrop-blur-md">
+    <div className="space-y-4 rounded-xl border border-white/[0.08] bg-precursor-card-glass p-5 backdrop-blur-xl shadow-glass-panel">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-violet-900/30 pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.08] pb-3">
         <div className="flex items-center gap-2">
-          <Scale className="h-4 w-4 text-cyan-400" />
-          <h3 className="text-sm font-semibold text-slate-200">
+          <Scale className="h-4 w-4 text-precursor-cyan" />
+          <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">
             Numerical Claim Verifier
           </h3>
-          <span className="rounded bg-cyan-500/10 border border-cyan-500/30 px-2 py-0.5 font-mono text-[10px] text-cyan-300">
+          <span className="rounded bg-cyan-500/10 border border-cyan-500/30 px-2 py-0.5 font-mono text-[10px] text-cyan-300 font-bold">
             EVIDENCE CHECKING
           </span>
         </div>
 
         <div className="rounded border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 font-mono text-[10px] text-amber-300">
-          DEMO VERIFICATION — NOT CONNECTED TO VERIFIER
+          DEMO VERIFICATION — STANDALONE EVIDENCE CHECK
         </div>
       </div>
 

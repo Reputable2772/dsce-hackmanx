@@ -8,13 +8,13 @@ interface CurrentFaultListProps {
 
 export const CurrentFaultList: React.FC<CurrentFaultListProps> = ({ faults }) => {
   return (
-    <div className="rounded-xl border border-rose-500/30 bg-navy-900/60 p-4 backdrop-blur-md">
+    <div className="rounded-xl border border-rose-500/30 bg-precursor-card-glass p-4 backdrop-blur-xl shadow-glass-panel">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rose-500/20 pb-3">
         <div className="flex items-center gap-2">
           <AlertCircle className="h-4 w-4 text-rose-400" />
-          <h3 className="text-sm font-semibold text-slate-200">
-            Current Rule-Based Faults (Immediate Alerts)
+          <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-rose-200">
+            Immediate Faults (Active Outages)
           </h3>
           <span className="rounded bg-rose-500/20 border border-rose-500/40 px-2 py-0.5 font-mono text-[11px] text-rose-300 font-bold">
             {faults.length} ACTIVE
@@ -23,13 +23,8 @@ export const CurrentFaultList: React.FC<CurrentFaultListProps> = ({ faults }) =>
 
         <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400">
           <span className="h-2 w-2 rounded-full bg-rose-400 animate-pulse" />
-          <span>ZERO-LATENCY DETERMINISTIC RULES (Bypasses Forecasting)</span>
+          <span>Zero-latency rule alerts • Isolated from predictive models</span>
         </div>
-      </div>
-
-      {/* Crucial distinction note */}
-      <div className="my-2.5 rounded-lg border border-rose-900/50 bg-rose-950/20 px-3 py-2 text-[11px] text-slate-300">
-        <strong className="text-rose-300">Architectural Note:</strong> These are <em>currently occurring faults</em> identified by deterministic zero-latency boundary rules. They are visually and logically isolated from future horizon predictions.
       </div>
 
       {/* Fault Cards */}

@@ -29,14 +29,14 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     const quality = pt?.quality || 'good';
 
     return (
-      <div className="rounded-lg border border-violet-800/80 bg-navy-950/95 p-3 font-mono text-xs shadow-xl backdrop-blur-md">
-        <div className="flex items-center justify-between gap-3 border-b border-violet-900/50 pb-1.5 text-slate-400">
-          <span>Time: <strong className="text-slate-200">{label}</strong></span>
-          <span className={`rounded px-1.5 py-0.2 text-[10px] uppercase font-bold ${
-            quality === 'good' ? 'bg-emerald-500/20 text-emerald-300' :
-            quality === 'stale' ? 'bg-amber-500/20 text-amber-300' :
-            quality === 'missing' ? 'bg-rose-500/20 text-rose-300' :
-            'bg-purple-500/20 text-purple-300'
+      <div className="rounded-xl border border-white/[0.1] bg-precursor-card-glass p-3 font-mono text-xs shadow-glass-panel backdrop-blur-2xl">
+        <div className="flex items-center justify-between gap-3 border-b border-white/[0.08] pb-1.5 text-slate-400">
+          <span>Time: <strong className="text-white font-bold">{label}</strong></span>
+          <span className={`rounded-md px-1.5 py-0.5 text-[10px] uppercase font-bold ${
+            quality === 'good' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+            quality === 'stale' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+            quality === 'missing' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' :
+            'bg-purple-500/20 text-purple-300 border border-purple-500/30'
           }`}>
             {quality}
           </span>
@@ -49,7 +49,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
                 <span>{entry.name}:</span>
               </span>
-              <span className="font-bold text-slate-100">
+              <span className="font-bold text-white">
                 {entry.value !== null && entry.value !== undefined ? entry.value : <span className="text-rose-400 italic">NULL (Missing)</span>}
               </span>
             </div>
@@ -57,8 +57,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         </div>
 
         {pt?.isEventWindow && (
-          <div className="mt-2 flex items-center gap-1 border-t border-violet-900/40 pt-1.5 text-[10px] text-amber-400">
-            <AlertTriangle className="h-3 w-3" />
+          <div className="mt-2 flex items-center gap-1.5 border-t border-white/[0.06] pt-1.5 text-[10px] text-amber-400">
+            <AlertTriangle className="h-3.5 w-3.5" />
             <span>Event window: Contention & Buffer Saturation</span>
           </div>
         )}
@@ -81,46 +81,46 @@ export const TelemetryChartSection: React.FC<TelemetryChartSectionProps> = ({
   return (
     <div className="space-y-4">
       {/* Chart Section Header & Toggles */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-violet-900/40 bg-navy-900/60 px-4 py-3 backdrop-blur-md">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-precursor-card-glass px-4 py-3 backdrop-blur-xl shadow-glass-panel">
         <div className="flex items-center gap-2">
-          <Layers className="h-4 w-4 text-cyan-400" />
-          <h3 className="text-sm font-semibold text-slate-200">
+          <Layers className="h-4 w-4 text-precursor-cyan" />
+          <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">
             Telemetry Time-Series Observation Buffer
           </h3>
-          <span className="rounded bg-violet-900/60 px-2 py-0.5 font-mono text-[11px] text-violet-300">
+          <span className="rounded bg-precursor-violet/60 border border-precursor-purple/30 px-2 py-0.5 font-mono text-[11px] text-precursor-lavender">
             {data.length} steps @ 5s
           </span>
         </div>
 
         {/* Toggles */}
-        <div className="flex items-center gap-4 text-xs">
-          <label className="flex cursor-pointer items-center gap-1.5 text-slate-300">
+        <div className="flex items-center gap-4 text-xs font-mono">
+          <label className="flex cursor-pointer items-center gap-1.5 text-slate-300 hover:text-white transition">
             <input
               type="checkbox"
               checked={showThresholds}
               onChange={(e) => setShowThresholds(e.target.checked)}
-              className="rounded border-violet-800 bg-navy-950 text-cyan-400 focus:ring-0"
+              className="rounded border-white/[0.2] bg-precursor-surface text-precursor-cyan focus:ring-0"
             />
             <span>SLA Threshold Lines</span>
           </label>
 
-          <label className="flex cursor-pointer items-center gap-1.5 text-slate-300">
+          <label className="flex cursor-pointer items-center gap-1.5 text-slate-300 hover:text-white transition">
             <input
               type="checkbox"
               checked={showEventWindows}
               onChange={(e) => setShowEventWindows(e.target.checked)}
-              className="rounded border-violet-800 bg-navy-950 text-cyan-400 focus:ring-0"
+              className="rounded border-white/[0.2] bg-precursor-surface text-precursor-cyan focus:ring-0"
             />
             <span>Highlight Event Windows</span>
           </label>
 
           {/* View Tab Selector */}
-          <div className="flex rounded-lg border border-violet-800/60 bg-navy-950 p-0.5">
+          <div className="flex rounded-lg border border-white/[0.1] bg-precursor-surface p-0.5">
             <button
               onClick={() => setActiveTab('latency_loss')}
-              className={`rounded px-2.5 py-1 text-xs font-medium transition ${
+              className={`rounded-md px-2.5 py-1 text-xs font-bold transition ${
                 activeTab === 'latency_loss'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                  ? 'bg-precursor-purple text-white shadow-glow-purple/20'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -128,9 +128,9 @@ export const TelemetryChartSection: React.FC<TelemetryChartSectionProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('throughput_jitter')}
-              className={`rounded px-2.5 py-1 text-xs font-medium transition ${
+              className={`rounded-md px-2.5 py-1 text-xs font-bold transition ${
                 activeTab === 'throughput_jitter'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                  ? 'bg-precursor-purple text-white shadow-glow-purple/20'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -141,7 +141,7 @@ export const TelemetryChartSection: React.FC<TelemetryChartSectionProps> = ({
       </div>
 
       {/* Main Primary Chart Container */}
-      <div className="rounded-xl border border-violet-900/40 bg-navy-900/60 p-4 backdrop-blur-md">
+      <div className="rounded-xl border border-white/[0.08] bg-precursor-card-glass p-4 backdrop-blur-xl shadow-glass-panel">
         {activeTab === 'latency_loss' ? (
           <div>
             <div className="mb-2 flex items-center justify-between text-xs text-slate-400 font-mono">

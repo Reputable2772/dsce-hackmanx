@@ -24,21 +24,21 @@ export const PredictionResultCard: React.FC<PredictionResultCardProps> = ({
   const isDegraded = activeGateState === 'DEGRADED';
 
   return (
-    <div className={`rounded-xl border p-4 backdrop-blur-md transition-all duration-200 ${
+    <div className={`rounded-xl border p-4 backdrop-blur-xl transition-all duration-200 shadow-glass-panel ${
       isAbstain
-        ? 'border-slate-800 bg-navy-950/40 opacity-75'
+        ? 'border-slate-800 bg-precursor-card-glass opacity-70'
         : prediction.predictedImpact
-        ? 'border-purple-500/40 bg-navy-900/60 hover:border-purple-500/70'
-        : 'border-violet-900/40 bg-navy-900/40'
+        ? 'border-precursor-purple/40 bg-precursor-card-glass hover:border-precursor-purple/70'
+        : 'border-white/[0.08] bg-precursor-card-glass'
     }`}>
       {/* Top Header Row */}
-      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-violet-900/30 pb-3">
+      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-white/[0.08] pb-3">
         <div>
           <div className="flex items-center gap-2">
-            <span className="rounded bg-purple-500/20 border border-purple-500/30 px-2 py-0.5 font-mono text-[10px] font-bold text-purple-300">
+            <span className="rounded-md bg-precursor-purple/20 border border-precursor-purple/30 px-2 py-0.5 font-mono text-[10px] font-bold text-precursor-lavender">
               +{prediction.horizonMinutes}M HORIZON
             </span>
-            <span className="font-mono text-xs text-cyan-300">
+            <span className="font-mono text-xs text-precursor-cyan font-semibold">
               {prediction.targetEntity}
             </span>
           </div>

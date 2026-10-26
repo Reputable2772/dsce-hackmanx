@@ -47,9 +47,6 @@ export const ScenarioToolbar: React.FC = () => {
           <span>Active Context:</span>
           <span className="font-semibold text-slate-200">{activeScenario}</span>
         </div>
-        <div className="hidden items-center gap-1 rounded border border-precursor-border bg-precursor-violet/30 px-2 py-0.5 font-mono text-[11px] text-precursor-lavender md:inline-flex">
-          Phase 1 Foundation
-        </div>
       </div>
     </div>
   );

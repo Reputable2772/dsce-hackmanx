@@ -9,24 +9,24 @@ export const DetectorEvidencePanel: React.FC = () => {
   const current = DETECTOR_METADATA.find(d => d.id === selectedDetector) || DETECTOR_METADATA[0];
 
   return (
-    <div className="rounded-xl border border-violet-900/40 bg-navy-900/60 p-4 backdrop-blur-md">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-violet-900/30 pb-3">
+    <div className="rounded-xl border border-white/[0.08] bg-precursor-card-glass p-4 backdrop-blur-xl shadow-glass-panel">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
         <div className="flex items-center gap-2">
-          <Layers className="h-4 w-4 text-purple-400" />
-          <h3 className="text-sm font-semibold text-slate-200">
+          <Layers className="h-4 w-4 text-precursor-purple" />
+          <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">
             Precursor Detection Engine Architecture & Models
           </h3>
         </div>
 
         {/* Tab pills */}
-        <div className="flex rounded-lg border border-violet-800/60 bg-navy-950 p-0.5">
+        <div className="flex rounded-lg border border-white/[0.1] bg-precursor-surface p-0.5">
           {DETECTOR_METADATA.map((d) => (
             <button
               key={d.id}
               onClick={() => setSelectedDetector(d.id)}
-              className={`rounded px-2.5 py-1 text-xs font-mono transition ${
+              className={`rounded px-2.5 py-1 text-xs font-mono font-bold transition ${
                 selectedDetector === d.id
-                  ? 'bg-purple-600 text-white font-bold'
+                  ? 'bg-precursor-purple text-white shadow-glow-purple/20'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >

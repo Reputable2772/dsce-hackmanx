@@ -22,7 +22,7 @@ export const TelemetryMetricCards: React.FC<TelemetryMetricCardsProps> = ({
   onSelectMetric
 }) => {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       {metrics.map((metric) => {
         const isSelected = selectedMetric === metric.id;
         const isWarning = metric.currentValue !== null && metric.currentValue >= metric.thresholdWarning;
@@ -32,15 +32,15 @@ export const TelemetryMetricCards: React.FC<TelemetryMetricCardsProps> = ({
           <div
             key={metric.id}
             onClick={() => onSelectMetric(metric.id)}
-            className={`group relative flex cursor-pointer flex-col justify-between rounded-xl border p-4 backdrop-blur-md transition-all duration-200 ${
+            className={`group relative flex cursor-pointer flex-col justify-between rounded-xl border p-3.5 backdrop-blur-xl transition-all duration-200 ${
               isSelected
-                ? 'border-cyan-400/80 bg-navy-800/80 shadow-[0_0_15px_rgba(72,221,245,0.15)] ring-1 ring-cyan-400/50'
-                : 'border-violet-900/40 bg-navy-900/60 hover:border-violet-700/60 hover:bg-navy-800/40'
+                ? 'border-precursor-cyan bg-precursor-surface/90 shadow-glow-cyan/20 ring-1 ring-precursor-cyan/60'
+                : 'border-white/[0.08] bg-precursor-card-glass hover:border-precursor-purple/40 hover:bg-precursor-surface/60'
             }`}
           >
             {/* Header: Label & Tooltip */}
             <div className="flex items-start justify-between gap-1">
-              <span className="text-xs font-semibold text-slate-300">
+              <span className="text-xs font-semibold text-slate-300 group-hover:text-white transition-colors">
                 {metric.label}
               </span>
               <span title={metric.description} className="cursor-help text-slate-500 hover:text-slate-300">
@@ -51,16 +51,16 @@ export const TelemetryMetricCards: React.FC<TelemetryMetricCardsProps> = ({
             {/* Value & Unit */}
             <div className="my-2">
               <div className="flex items-baseline gap-1.5">
-                <span className={`font-mono text-2xl font-bold tracking-tight ${
+                <span className={`font-mono text-2xl font-extrabold tracking-tight ${
                   isCritical 
-                    ? 'text-rose-400' 
+                    ? 'text-rose-400 text-glow-coral' 
                     : isWarning 
-                    ? 'text-amber-400' 
-                    : 'text-slate-100'
+                    ? 'text-amber-400 text-glow-amber' 
+                    : 'text-white'
                 }`}>
                   {metric.currentValue !== null ? metric.currentValue : '—'}
                 </span>
-                <span className="font-mono text-xs text-slate-400">
+                <span className="font-mono text-xs text-slate-400 font-semibold">
                   {metric.unit}
                 </span>
               </div>
@@ -68,13 +68,13 @@ export const TelemetryMetricCards: React.FC<TelemetryMetricCardsProps> = ({
               {/* P95 Indicator if available */}
               {metric.p95Value !== undefined && (
                 <div className="mt-0.5 text-[10px] font-mono text-slate-400">
-                  P95: <span className="text-slate-300">{metric.p95Value} {metric.unit}</span>
+                  P95: <span className="text-slate-300 font-semibold">{metric.p95Value} {metric.unit}</span>
                 </div>
               )}
             </div>
 
             {/* Footer: Trend & Threshold status */}
-            <div className="flex items-center justify-between border-t border-violet-900/30 pt-2 text-[11px]">
+            <div className="flex items-center justify-between border-t border-white/[0.06] pt-2 text-[11px]">
               <div className="flex items-center gap-1 font-mono">
                 {metric.trend === 'up' ? (
                   <ArrowUpRight className={`h-3 w-3 ${metric.id === 'throughput_mbps' ? 'text-emerald-400' : 'text-amber-400'}`} />
@@ -88,7 +88,7 @@ export const TelemetryMetricCards: React.FC<TelemetryMetricCardsProps> = ({
                 </span>
               </div>
 
-              <span className={`rounded px-1.5 py-0.5 text-[10px] font-mono font-medium ${
+              <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-mono font-bold ${
                 isCritical 
                   ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' 
                   : isWarning 
@@ -98,17 +98,12 @@ export const TelemetryMetricCards: React.FC<TelemetryMetricCardsProps> = ({
                 {isCritical ? 'CRITICAL' : isWarning ? 'ELEVATED' : 'NOMINAL'}
               </span>
             </div>
-
-            {/* Bottom demonstration disclaimer */}
-            <div className="mt-2 text-[9px] font-mono text-slate-400/80">
-              * ILLUSTRATIVE FIXTURE
-            </div>
           </div>
         );
       })}
 
       {/* 6th Card: Sensor Health & Quality */}
-      <div className="flex flex-col justify-between rounded-xl border border-violet-900/40 bg-navy-900/60 p-4 backdrop-blur-md">
+      <div className="flex flex-col justify-between rounded-xl border border-white/[0.08] bg-precursor-card-glass p-3.5 backdrop-blur-xl">
         <div className="flex items-start justify-between gap-1">
           <span className="text-xs font-semibold text-slate-300">
             Sensor Completeness
@@ -120,7 +115,7 @@ export const TelemetryMetricCards: React.FC<TelemetryMetricCardsProps> = ({
 
         <div className="my-2">
           <div className="flex items-baseline gap-1.5">
-            <span className="font-mono text-2xl font-bold tracking-tight text-emerald-400">
+            <span className="font-mono text-2xl font-extrabold tracking-tight text-emerald-400">
               {(qualityAudit.sensorHealthScore * 100).toFixed(1)}%
             </span>
           </div>
@@ -129,19 +124,15 @@ export const TelemetryMetricCards: React.FC<TelemetryMetricCardsProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center justify-between border-t border-violet-900/30 pt-2 text-[11px]">
+        <div className="flex items-center justify-between border-t border-white/[0.06] pt-2 text-[11px]">
           <div className="flex items-center gap-1 font-mono text-slate-300">
             <CheckCircle2 className="h-3 w-3 text-emerald-400" />
-            <span>5s sampling</span>
+            <span>5s rate</span>
           </div>
 
-          <span className="rounded border border-emerald-500/40 bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-mono font-medium text-emerald-300">
+          <span className="rounded-md border border-emerald-500/40 bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-mono font-bold text-emerald-300">
             VALIDATED
           </span>
-        </div>
-
-        <div className="mt-2 text-[9px] font-mono text-slate-400/80">
-          * QUALITY MONITORED
         </div>
       </div>
     </div>

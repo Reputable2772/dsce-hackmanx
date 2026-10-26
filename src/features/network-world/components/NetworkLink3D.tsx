@@ -2,6 +2,7 @@ import React, { useMemo, useState, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { TopologyLinkData, TopologyNodeData } from '../types';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 
 interface NetworkLink3DProps {
   link: TopologyLinkData;
@@ -22,6 +23,7 @@ export const NetworkLink3D: React.FC<NetworkLink3DProps> = ({
   onSelect,
   onHover,
 }) => {
+  const { showParticles, reducedMotion } = useSettingsStore();
   const [internalHover, setInternalHover] = useState(false);
   const flowParticleRef = useRef<THREE.Mesh>(null);
 
@@ -105,7 +107,7 @@ export const NetworkLink3D: React.FC<NetworkLink3DProps> = ({
       </mesh>
 
       {/* Traffic Pulse / Flow Packet */}
-      {link.status !== 'down' && (
+      {link.status !== 'down' && showParticles && !reducedMotion && (
         <mesh ref={flowParticleRef}>
           <sphereGeometry args={[0.09, 8, 8]} />
           <meshBasicMaterial color="#FFFFFF" />

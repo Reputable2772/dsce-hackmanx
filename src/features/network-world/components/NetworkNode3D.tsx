@@ -36,12 +36,12 @@ export const NetworkNode3D: React.FC<NetworkNode3DProps> = ({
   const baseColor = statusColors[node.status] || '#45D6B5';
   const effectiveColor = isSelected ? '#9B7BFF' : (internalHover || isHovered) ? '#48DDF5' : baseColor;
 
-  // Gentle animation for pulse ring
-  useFrame((_, delta) => {
+  // Gentle animation for pulse ring and ambient node breathing
+  useFrame((state, delta) => {
     if (pulseRingRef.current) {
-      if (node.status === 'degraded' || isSelected) {
-        pulseRingRef.current.rotation.z += delta * 1.5;
-        const scale = 1 + Math.sin(Date.now() * 0.004) * 0.15;
+      if (node.status === 'degraded' || node.status === 'critical' || isSelected) {
+        pulseRingRef.current.rotation.z += delta * (node.status === 'critical' ? 2.5 : 1.2);
+        const scale = 1 + Math.sin(state.clock.elapsedTime * (node.status === 'critical' ? 8 : 4)) * 0.15;
         pulseRingRef.current.scale.set(scale, scale, scale);
       }
     }
@@ -71,65 +71,120 @@ export const NetworkNode3D: React.FC<NetworkNode3DProps> = ({
       case 'gateway':
         return (
           <group>
-            {/* Dual pillar gateway */}
-            <mesh position={[-0.4, 0, 0]} castShadow>
-              <cylinderGeometry args={[0.25, 0.3, 1.4, 16]} />
-              <meshStandardMaterial color={effectiveColor} roughness={0.3} metalness={0.7} />
+            {/* Dual cybernetic gateway pillars */}
+            <mesh position={[-0.45, 0, 0]} castShadow>
+              <cylinderGeometry args={[0.2, 0.28, 1.5, 16]} />
+              <meshStandardMaterial color={effectiveColor} roughness={0.25} metalness={0.75} />
             </mesh>
-            <mesh position={[0.4, 0, 0]} castShadow>
-              <cylinderGeometry args={[0.25, 0.3, 1.4, 16]} />
-              <meshStandardMaterial color={effectiveColor} roughness={0.3} metalness={0.7} />
+            <mesh position={[0.45, 0, 0]} castShadow>
+              <cylinderGeometry args={[0.2, 0.28, 1.5, 16]} />
+              <meshStandardMaterial color={effectiveColor} roughness={0.25} metalness={0.75} />
             </mesh>
-            <mesh position={[0, 0.6, 0]}>
-              <boxGeometry args={[1.2, 0.2, 0.5]} />
-              <meshStandardMaterial color="#29204A" roughness={0.5} metalness={0.5} />
+            {/* Top bridging arch */}
+            <mesh position={[0, 0.72, 0]}>
+              <boxGeometry args={[1.3, 0.18, 0.45]} />
+              <meshStandardMaterial color="#1C1838" roughness={0.4} metalness={0.6} />
             </mesh>
-            {/* Glowing core sphere */}
-            <mesh position={[0, 0, 0]}>
-              <sphereGeometry args={[0.3, 16, 16]} />
-              <meshStandardMaterial color="#48DDF5" emissive="#48DDF5" emissiveIntensity={0.6} />
+            {/* Hovering plasma core */}
+            <mesh position={[0, 0.05, 0]}>
+              <sphereGeometry args={[0.32, 24, 24]} />
+              <meshStandardMaterial
+                color="#48DDF5"
+                emissive="#48DDF5"
+                emissiveIntensity={isSelected ? 1.2 : 0.7}
+                roughness={0.1}
+              />
             </mesh>
           </group>
         );
 
       case 'router':
         return (
-          <mesh castShadow>
-            <cylinderGeometry args={[0.7, 0.7, 0.45, 8]} />
-            <meshStandardMaterial color={effectiveColor} roughness={0.3} metalness={0.6} />
-          </mesh>
+          <group>
+            {/* Octagonal core chassis */}
+            <mesh castShadow>
+              <cylinderGeometry args={[0.75, 0.75, 0.35, 8]} />
+              <meshStandardMaterial color="#1E2340" roughness={0.3} metalness={0.6} />
+            </mesh>
+            {/* Elevated glowing optical disc */}
+            <mesh position={[0, 0.2, 0]}>
+              <cylinderGeometry args={[0.45, 0.45, 0.1, 16]} />
+              <meshStandardMaterial
+                color={effectiveColor}
+                emissive={effectiveColor}
+                emissiveIntensity={isSelected ? 0.9 : 0.55}
+                roughness={0.2}
+              />
+            </mesh>
+            {/* Outer telemetry ring */}
+            <mesh position={[0, -0.1, 0]}>
+              <torusGeometry args={[0.82, 0.04, 12, 24]} />
+              <meshStandardMaterial color={effectiveColor} emissive={effectiveColor} emissiveIntensity={0.4} />
+            </mesh>
+          </group>
         );
 
       case 'switch':
         return (
           <group>
+            {/* Rack chassis */}
             <mesh castShadow>
-              <boxGeometry args={[1.4, 0.3, 0.8]} />
-              <meshStandardMaterial color="#1E2238" roughness={0.4} metalness={0.6} />
+              <boxGeometry args={[1.5, 0.35, 0.85]} />
+              <meshStandardMaterial color="#1A1E35" roughness={0.4} metalness={0.65} />
             </mesh>
-            {/* Front status bezel */}
-            <mesh position={[0, 0, 0.41]}>
-              <boxGeometry args={[1.3, 0.15, 0.02]} />
-              <meshStandardMaterial color={effectiveColor} emissive={effectiveColor} emissiveIntensity={0.5} />
+            {/* Front port bezel with luminous fiber ports */}
+            <mesh position={[0, 0, 0.43]}>
+              <boxGeometry args={[1.35, 0.18, 0.02]} />
+              <meshStandardMaterial
+                color={effectiveColor}
+                emissive={effectiveColor}
+                emissiveIntensity={isSelected ? 0.8 : 0.45}
+              />
             </mesh>
           </group>
         );
 
       case 'server':
         return (
-          <mesh castShadow>
-            <boxGeometry args={[0.9, 0.9, 0.9]} />
-            <meshStandardMaterial color={effectiveColor} roughness={0.4} metalness={0.5} />
-          </mesh>
+          <group>
+            {/* Vertical data blade tower */}
+            <mesh castShadow position={[0, 0.1, 0]}>
+              <boxGeometry args={[0.75, 1.3, 0.75]} />
+              <meshStandardMaterial color="#181B30" roughness={0.35} metalness={0.7} />
+            </mesh>
+            {/* Front drive bay status lines */}
+            <mesh position={[0, 0.35, 0.38]}>
+              <boxGeometry args={[0.55, 0.08, 0.02]} />
+              <meshStandardMaterial color={effectiveColor} emissive={effectiveColor} emissiveIntensity={0.6} />
+            </mesh>
+            <mesh position={[0, 0.1, 0.38]}>
+              <boxGeometry args={[0.55, 0.08, 0.02]} />
+              <meshStandardMaterial color={effectiveColor} emissive={effectiveColor} emissiveIntensity={0.6} />
+            </mesh>
+            <mesh position={[0, -0.15, 0.38]}>
+              <boxGeometry args={[0.55, 0.08, 0.02]} />
+              <meshStandardMaterial color={effectiveColor} emissive={effectiveColor} emissiveIntensity={0.6} />
+            </mesh>
+          </group>
         );
 
       case 'endpoint':
       default:
         return (
-          <mesh castShadow>
-            <sphereGeometry args={[0.45, 16, 16]} />
-            <meshStandardMaterial color={effectiveColor} roughness={0.2} metalness={0.8} />
-          </mesh>
+          <group>
+            {/* Geodesic probe sphere */}
+            <mesh castShadow>
+              <icosahedronGeometry args={[0.48, 1]} />
+              <meshStandardMaterial
+                color={effectiveColor}
+                emissive={effectiveColor}
+                emissiveIntensity={isSelected ? 0.6 : 0.3}
+                roughness={0.2}
+                metalness={0.8}
+                wireframe={false}
+              />
+            </mesh>
+          </group>
         );
     }
   };

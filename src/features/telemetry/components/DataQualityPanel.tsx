@@ -15,14 +15,14 @@ interface DataQualityPanelProps {
 
 export const DataQualityPanel: React.FC<DataQualityPanelProps> = ({ audit }) => {
   return (
-    <div className="rounded-xl border border-violet-900/40 bg-navy-900/60 p-4 backdrop-blur-md">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-violet-900/40 pb-3">
+    <div className="rounded-xl border border-white/[0.08] bg-precursor-card-glass p-4 backdrop-blur-xl shadow-glass-panel">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
         <div className="flex items-center gap-2">
           <ShieldAlert className="h-4 w-4 text-amber-400" />
-          <h3 className="text-sm font-semibold text-slate-200">
+          <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">
             Telemetry Quality & Invalidation Guard
           </h3>
-          <span className="rounded bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 font-mono text-[11px] text-amber-300">
+          <span className="rounded bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 font-mono text-[11px] font-bold text-amber-300">
             AUDIT ACTIVE
           </span>
         </div>

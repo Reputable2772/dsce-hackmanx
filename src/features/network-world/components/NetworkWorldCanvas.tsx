@@ -1,8 +1,9 @@
 import React, { useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { RotateCcw, Target, Tag, X, Box } from 'lucide-react';
+import { RotateCcw, Target, Tag, X, Box, Activity, PanelRightOpen, PanelRightClose, HelpCircle } from 'lucide-react';
 import { NetworkTopologyData, TopologyNodeData, TopologyLinkData } from '../types';
 import { NetworkScene } from './NetworkScene';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 
 interface NetworkWorldCanvasProps {
   topology: NetworkTopologyData;
@@ -10,6 +11,11 @@ interface NetworkWorldCanvasProps {
   selectedLinkId: string | null;
   onSelectNode: (node: TopologyNodeData | null) => void;
   onSelectLink: (link: TopologyLinkData | null) => void;
+  inspectorOpen: boolean;
+  onToggleInspector: () => void;
+  legendOpen: boolean;
+  onToggleLegend: () => void;
+  className?: string;
 }
 
 export const NetworkWorldCanvas: React.FC<NetworkWorldCanvasProps> = ({
@@ -18,11 +24,17 @@ export const NetworkWorldCanvas: React.FC<NetworkWorldCanvasProps> = ({
   selectedLinkId,
   onSelectNode,
   onSelectLink,
+  inspectorOpen,
+  onToggleInspector,
+  legendOpen,
+  onToggleLegend,
+  className = '',
 }) => {
   const controlsRef = useRef<any>(null);
   const [hoveredNode, setHoveredNode] = useState<TopologyNodeData | null>(null);
   const [, setHoveredLink] = useState<TopologyLinkData | null>(null);
   const [showLabels, setShowLabels] = useState(true);
+  const { showParticles, setShowParticles } = useSettingsStore();
 
   // Camera action: Reset view
   const handleResetCamera = () => {
@@ -51,43 +63,43 @@ export const NetworkWorldCanvas: React.FC<NetworkWorldCanvasProps> = ({
   };
 
   return (
-    <div className="relative h-[560px] w-full overflow-hidden rounded-2xl border border-precursor-border bg-precursor-navy shadow-2xl">
-      {/* Top Floating Viewport Toolbar */}
-      <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-2 font-mono text-xs">
-        <div className="flex items-center gap-2 rounded-lg border border-precursor-border bg-precursor-card/90 px-3 py-1.5 backdrop-blur-md shadow-lg">
-          <Box className="h-3.5 w-3.5 text-precursor-cyan" />
-          <span className="font-bold text-white">R3F DIGITAL TWIN</span>
+    <div className={`relative h-full w-full min-h-[640px] overflow-hidden rounded-2xl border border-precursor-border bg-precursor-navy-deep shadow-2xl ${className}`}>
+      {/* Top Floating Viewport HUD */}
+      <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-2 font-mono text-xs pointer-events-auto">
+        <div className="flex items-center gap-2 rounded-xl border border-precursor-border-active bg-precursor-card/85 px-3 py-1.5 backdrop-blur-xl shadow-glass-panel">
+          <Box className="h-4 w-4 text-precursor-cyan animate-pulse" />
+          <span className="font-extrabold tracking-wider text-white">DIGITAL TWIN</span>
           <span className="rounded bg-precursor-purple/20 px-1.5 py-0.5 text-[10px] text-precursor-lavender font-semibold">
-            INTERACTIVE
+            R3F 3D
           </span>
         </div>
 
         {topology.isDemoFixture && (
-          <span className="rounded-lg border border-precursor-border bg-precursor-card/90 px-2.5 py-1.5 text-slate-400 backdrop-blur-md">
-            Demo Topology Fixture
+          <span className="rounded-xl border border-white/[0.08] bg-precursor-card/75 px-2.5 py-1.5 text-slate-400 backdrop-blur-xl text-[11px]">
+            Deterministic Fabric Fixture
           </span>
         )}
       </div>
 
-      {/* Top-Right Camera & Inspection Action Bar */}
-      <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+      {/* Top-Right Camera & Inspection HUD Action Bar */}
+      <div className="absolute top-4 right-4 z-10 flex flex-wrap items-center gap-1.5 pointer-events-auto">
         <button
           type="button"
           onClick={handleResetCamera}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-precursor-border bg-precursor-card/90 px-2.5 py-1.5 font-mono text-xs font-semibold text-slate-300 shadow-md backdrop-blur-md transition-all hover:border-precursor-purple hover:text-white hover:bg-precursor-surface"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-precursor-card/85 px-2.5 py-1.5 font-mono text-xs font-semibold text-slate-300 shadow-glass-panel backdrop-blur-xl transition-all hover:border-precursor-purple/50 hover:text-white hover:bg-precursor-surface"
           title="Reset Camera to default perspective"
         >
           <RotateCcw className="h-3.5 w-3.5 text-precursor-cyan" />
-          <span className="hidden sm:inline">Reset Cam</span>
+          <span className="hidden sm:inline">Reset</span>
         </button>
 
         <button
           type="button"
           onClick={handleFocusSelected}
           disabled={!selectedNodeId}
-          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-mono text-xs font-semibold shadow-md backdrop-blur-md transition-all ${
+          className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 font-mono text-xs font-semibold shadow-glass-panel backdrop-blur-xl transition-all ${
             selectedNodeId
-              ? 'border-precursor-border bg-precursor-card/90 text-slate-300 hover:border-precursor-purple hover:text-white'
+              ? 'border-precursor-purple/50 bg-precursor-violet/60 text-white hover:bg-precursor-violet'
               : 'border-slate-800 bg-slate-900/40 text-slate-600 cursor-not-allowed'
           }`}
           title="Focus camera target on selected node"
@@ -99,10 +111,10 @@ export const NetworkWorldCanvas: React.FC<NetworkWorldCanvasProps> = ({
         <button
           type="button"
           onClick={() => setShowLabels(!showLabels)}
-          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-mono text-xs font-semibold shadow-md backdrop-blur-md transition-all ${
+          className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 font-mono text-xs font-semibold shadow-glass-panel backdrop-blur-xl transition-all ${
             showLabels
-              ? 'border-precursor-border-active bg-precursor-violet/60 text-white'
-              : 'border-precursor-border bg-precursor-card/90 text-slate-400 hover:text-slate-200'
+              ? 'border-precursor-purple/40 bg-precursor-violet/60 text-white'
+              : 'border-white/[0.08] bg-precursor-card/85 text-slate-400 hover:text-slate-200'
           }`}
           title="Toggle node labels"
         >
@@ -110,15 +122,57 @@ export const NetworkWorldCanvas: React.FC<NetworkWorldCanvasProps> = ({
           <span className="hidden sm:inline">Labels</span>
         </button>
 
+        <button
+          type="button"
+          onClick={() => setShowParticles(!showParticles)}
+          className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 font-mono text-xs font-semibold shadow-glass-panel backdrop-blur-xl transition-all ${
+            showParticles
+              ? 'border-cyan-500/40 bg-cyan-950/40 text-cyan-300'
+              : 'border-white/[0.08] bg-precursor-card/85 text-slate-400 hover:text-slate-200'
+          }`}
+          title="Toggle traffic flow pulses"
+        >
+          <Activity className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Traffic</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onToggleLegend}
+          className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 font-mono text-xs font-semibold shadow-glass-panel backdrop-blur-xl transition-all ${
+            legendOpen
+              ? 'border-precursor-purple/40 bg-precursor-violet/60 text-white'
+              : 'border-white/[0.08] bg-precursor-card/85 text-slate-400 hover:text-slate-200'
+          }`}
+          title="Toggle Topology Legend"
+        >
+          <HelpCircle className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Legend</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onToggleInspector}
+          className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 font-mono text-xs font-semibold shadow-glass-panel backdrop-blur-xl transition-all ${
+            inspectorOpen
+              ? 'border-precursor-cyan/40 bg-precursor-surface text-cyan-300'
+              : 'border-white/[0.08] bg-precursor-card/85 text-slate-400 hover:text-slate-200'
+          }`}
+          title="Toggle Inspector Drawer"
+        >
+          {inspectorOpen ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
+          <span className="hidden sm:inline">Inspector</span>
+        </button>
+
         {(selectedNodeId || selectedLinkId) && (
           <button
             type="button"
             onClick={handleClearSelection}
-            className="inline-flex items-center gap-1 rounded-lg border border-rose-500/40 bg-rose-500/20 px-2.5 py-1.5 font-mono text-xs font-semibold text-rose-300 shadow-md backdrop-blur-md transition-all hover:bg-rose-500/30"
+            className="inline-flex items-center gap-1 rounded-xl border border-rose-500/40 bg-rose-500/20 px-2.5 py-1.5 font-mono text-xs font-semibold text-rose-300 shadow-glass-panel backdrop-blur-xl transition-all hover:bg-rose-500/30"
             title="Clear active node/link selection"
           >
             <X className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Clear</span>
+            <span className="hidden sm:inline">Deselect</span>
           </button>
         )}
       </div>
@@ -145,15 +199,15 @@ export const NetworkWorldCanvas: React.FC<NetworkWorldCanvasProps> = ({
         />
       </Canvas>
 
-      {/* Bottom Help Indicator */}
-      <div className="absolute bottom-3 left-4 z-10 flex items-center gap-3 font-mono text-[11px] text-slate-500 pointer-events-none">
-        <span>Click node/link to inspect</span>
+      {/* Bottom Floating Interaction Hint Ribbon */}
+      <div className="absolute bottom-3 left-4 z-10 flex items-center gap-2 rounded-xl border border-white/[0.06] bg-precursor-navy-deep/80 px-3 py-1.5 font-mono text-[11px] text-slate-400 backdrop-blur-xl pointer-events-none shadow-glass-panel">
+        <span className="text-slate-300">Click node / link to inspect</span>
         <span>•</span>
-        <span>Drag to orbit</span>
+        <span>Orbit: Left-drag</span>
         <span>•</span>
-        <span>Right-click to pan</span>
+        <span>Pan: Right-drag</span>
         <span>•</span>
-        <span>Scroll to zoom</span>
+        <span>Zoom: Scroll</span>
       </div>
     </div>
   );

@@ -29,7 +29,7 @@
   }
 }
 
-/* Reduced motion preference */
+/* Reduced motion preference (OS or user-toggled) */
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
@@ -41,14 +41,68 @@
   }
 }
 
+.reduced-motion *,
+.reduced-motion ::before,
+.reduced-motion ::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
 /* Subtle background grid pattern */
 .bg-grid-pattern {
   background-size: 32px 32px;
   background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
 }
 
 .bg-radial-atmosphere {
-  background: radial-gradient(circle at 50% 0%, rgba(41, 32, 74, 0.6) 0%, rgba(17, 19, 35, 0.95) 70%, rgba(17, 19, 35, 1) 100%);
+  background: radial-gradient(circle at 50% -10%, rgba(55, 41, 102, 0.45) 0%, rgba(20, 24, 48, 0.9) 45%, rgba(11, 13, 27, 0.98) 80%, rgba(8, 10, 22, 1) 100%);
+}
+
+.bg-radial-hero {
+  background: radial-gradient(ellipse at 50% 20%, rgba(65, 48, 120, 0.3) 0%, rgba(14, 17, 34, 0.85) 60%, rgba(11, 13, 27, 1) 100%);
+}
+
+/* Cinematic Glass Panel */
+.glass-panel {
+  background: rgba(18, 21, 40, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+}
+
+.glass-panel-subtle {
+  background: rgba(14, 17, 34, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-panel-active {
+  background: rgba(28, 22, 58, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(155, 123, 255, 0.35);
+  box-shadow: 0 0 24px -4px rgba(155, 123, 255, 0.25);
+}
+
+/* Subtle glowing text and border utilities */
+.text-glow-cyan {
+  text-shadow: 0 0 12px rgba(72, 221, 245, 0.5);
+}
+
+.text-glow-purple {
+  text-shadow: 0 0 12px rgba(155, 123, 255, 0.5);
+}
+
+.text-glow-amber {
+  text-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+}
+
+.text-glow-coral {
+  text-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
 }

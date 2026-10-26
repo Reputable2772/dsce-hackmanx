@@ -77,22 +77,22 @@ export const IncidentSummaryCards: React.FC<IncidentSummaryCardsProps> = ({
           <button
             key={c.status}
             onClick={() => onSelectStatus(isSelected ? 'ALL' : c.status)}
-            className={`flex items-center justify-between rounded-xl border p-3.5 text-left backdrop-blur-md transition-all duration-200 ${
+            className={`flex items-center justify-between rounded-xl border p-3 text-left backdrop-blur-xl transition-all duration-200 shadow-glass-panel ${
               isSelected
-                ? `${c.border} ${c.bg} ring-1 ring-cyan-400/50 shadow-[0_0_12px_rgba(72,221,245,0.15)]`
-                : 'border-violet-900/40 bg-navy-900/60 hover:border-violet-700/60 hover:bg-navy-800/40'
+                ? `${c.border} ${c.bg} ring-1 ring-precursor-cyan/50 shadow-glow-cyan/20`
+                : 'border-white/[0.08] bg-precursor-card-glass hover:border-precursor-purple/40 hover:bg-precursor-surface/60'
             }`}
           >
             <div>
               <span className="text-xs font-semibold text-slate-300">
                 {c.label}
               </span>
-              <div className={`mt-1 font-mono text-2xl font-bold ${c.color}`}>
+              <div className={`mt-0.5 font-mono text-2xl font-extrabold ${c.color}`}>
                 {c.count}
               </div>
             </div>
-            <div className={`rounded-lg p-2 ${c.bg} border ${c.border}`}>
-              <Icon className={`h-5 w-5 ${c.color}`} />
+            <div className={`rounded-xl p-2 ${c.bg} border ${c.border}`}>
+              <Icon className={`h-4 w-4 ${c.color}`} />
             </div>
           </button>
         );

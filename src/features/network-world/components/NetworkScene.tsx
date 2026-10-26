@@ -3,6 +3,7 @@ import { OrbitControls, Sparkles } from '@react-three/drei';
 import { NetworkTopologyData, TopologyNodeData, TopologyLinkData } from '../types';
 import { NetworkNode3D } from './NetworkNode3D';
 import { NetworkLink3D } from './NetworkLink3D';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 
 interface NetworkSceneProps {
   topology: NetworkTopologyData;
@@ -31,6 +32,8 @@ export const NetworkScene: React.FC<NetworkSceneProps> = ({
   onClearSelection,
   controlsRef,
 }) => {
+  const { showParticles, showNodeLabels, autoRotateCamera, reducedMotion } = useSettingsStore();
+
   // Map nodes by ID for link vertex lookup
   const nodeMap = new Map<string, TopologyNodeData>();
   topology.nodes.forEach((n) => nodeMap.set(n.id, n));
@@ -45,8 +48,8 @@ export const NetworkScene: React.FC<NetworkSceneProps> = ({
   return (
     <>
       {/* Fog & Background for Atmospheric Depth */}
-      <color attach="background" args={['#111323']} />
-      <fog attach="fog" args={['#111323', 25, 60]} />
+      <color attach="background" args={['#0B0D1B']} />
+      <fog attach="fog" args={['#0B0D1B', 22, 58]} />
 
       {/* Orbit Navigation Controls */}
       <OrbitControls
@@ -57,27 +60,32 @@ export const NetworkScene: React.FC<NetworkSceneProps> = ({
         maxDistance={48}
         maxPolarAngle={Math.PI / 2 + 0.08}
         target={[0, 0.5, 1]}
+        autoRotate={autoRotateCamera}
+        autoRotateSpeed={0.8}
       />
 
       {/* Studio Lighting Rig */}
-      <ambientLight intensity={0.7} />
-      <directionalLight position={[12, 22, 16]} intensity={1.3} color="#FFFFFF" castShadow />
-      <pointLight position={[0, -4, 0]} intensity={0.6} color="#48DDF5" distance={30} />
-      <pointLight position={[0, 8, -6]} intensity={0.8} color="#9B7BFF" distance={25} />
+      <ambientLight intensity={0.65} color="#D9D2FF" />
+      <directionalLight position={[14, 24, 18]} intensity={1.4} color="#FFFFFF" castShadow />
+      <pointLight position={[0, -3.5, 0]} intensity={0.8} color="#48DDF5" distance={35} />
+      <pointLight position={[0, 9, -5]} intensity={1.1} color="#9B7BFF" distance={30} />
+      <pointLight position={[-12, 6, 8]} intensity={0.5} color="#45D6B5" distance={25} />
 
       {/* Atmospheric Ambient Sparkles */}
-      <Sparkles
-        count={45}
-        scale={24}
-        size={1.6}
-        speed={0.3}
-        opacity={0.3}
-        color="#9B7BFF"
-      />
+      {showParticles && !reducedMotion && (
+        <Sparkles
+          count={55}
+          scale={28}
+          size={1.8}
+          speed={0.25}
+          opacity={0.35}
+          color="#9B7BFF"
+        />
+      )}
 
-      {/* Ground Substrate Grid Plane */}
+      {/* Ground Substrate Perspective Cyber Grid Plane */}
       <group position={[0, -3.2, 0]}>
-        <gridHelper args={[40, 40, '#29204A', '#191B33']} />
+        <gridHelper args={[48, 48, '#4E3880', '#13162C']} />
       </group>
 
       {/* Background Click Listener for Deselection */}
@@ -124,7 +132,7 @@ export const NetworkScene: React.FC<NetworkSceneProps> = ({
             node={node}
             isSelected={selectedNodeId === node.id}
             isHovered={hoveredNode?.id === node.id}
-            showLabels={showLabels}
+            showLabels={showLabels && showNodeLabels}
             onSelect={onSelectNode}
             onHover={onHoverNode}
           />

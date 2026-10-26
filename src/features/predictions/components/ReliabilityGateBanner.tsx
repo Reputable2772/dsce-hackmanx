@@ -24,48 +24,48 @@ export const ReliabilityGateBanner: React.FC<ReliabilityGateBannerProps> = ({
   const isDegraded = activeGateState === 'DEGRADED';
 
   return (
-    <div className={`rounded-xl border p-4 backdrop-blur-md transition-all duration-300 ${
+    <div className={`rounded-xl border p-4 backdrop-blur-xl transition-all duration-300 shadow-glass-panel ${
       isAbstain
-        ? 'border-rose-500/50 bg-rose-950/30 ring-1 ring-rose-500/30'
+        ? 'border-rose-500/40 bg-rose-950/30 ring-1 ring-rose-500/30'
         : isDegraded
-        ? 'border-amber-500/50 bg-amber-950/30 ring-1 ring-amber-500/30'
-        : 'border-emerald-500/40 bg-emerald-950/20'
+        ? 'border-amber-500/40 bg-amber-950/30 ring-1 ring-amber-500/30'
+        : 'border-emerald-500/40 bg-precursor-card-glass'
     }`}>
       {/* Top Banner Row */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
         <div className="flex items-center gap-3">
-          <div className={`flex h-10 w-10 items-center justify-center rounded-lg border ${
+          <div className={`flex h-10 w-10 items-center justify-center rounded-xl border ${
             isAbstain
-              ? 'border-rose-500/40 bg-rose-500/20 text-rose-400'
+              ? 'border-rose-500/40 bg-rose-500/20 text-rose-400 shadow-glow-coral'
               : isDegraded
-              ? 'border-amber-500/40 bg-amber-500/20 text-amber-400'
-              : 'border-emerald-500/40 bg-emerald-500/20 text-emerald-400'
+              ? 'border-amber-500/40 bg-amber-500/20 text-amber-400 shadow-glow-amber'
+              : 'border-emerald-500/40 bg-emerald-500/20 text-emerald-400 shadow-glow-teal'
           }`}>
             {isAbstain ? (
-              <ShieldX className="h-6 w-6" />
+              <ShieldX className="h-5 w-5" />
             ) : isDegraded ? (
-              <ShieldAlert className="h-6 w-6" />
+              <ShieldAlert className="h-5 w-5" />
             ) : (
-              <ShieldCheck className="h-6 w-6" />
+              <ShieldCheck className="h-5 w-5" />
             )}
           </div>
 
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono font-medium text-slate-400">
-                RELIABILITY GATE DECISION:
+            <div className="flex items-center gap-2 font-mono">
+              <span className="text-xs font-semibold text-slate-400">
+                RELIABILITY GATE:
               </span>
-              <span className={`font-mono text-sm font-bold tracking-wider ${
+              <span className={`text-sm font-extrabold tracking-wider ${
                 isAbstain
-                  ? 'text-rose-400'
+                  ? 'text-rose-400 text-glow-coral'
                   : isDegraded
-                  ? 'text-amber-400'
+                  ? 'text-amber-400 text-glow-amber'
                   : 'text-emerald-400'
               }`}>
                 {activeGateState}
               </span>
-              <span className="rounded bg-slate-800/80 px-2 py-0.5 text-[10px] font-mono text-slate-300">
-                DEMO SCENARIO SWITCHABLE
+              <span className="rounded bg-precursor-surface border border-white/[0.08] px-2 py-0.5 text-[10px] text-slate-300">
+                ILLUSTRATIVE DEMO FIXTURE
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-0.5">
@@ -79,23 +79,23 @@ export const ReliabilityGateBanner: React.FC<ReliabilityGateBannerProps> = ({
         </div>
 
         {/* Gate State Simulator Buttons */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400 font-mono flex items-center gap-1">
-            <Sliders className="h-3 w-3 text-cyan-400" />
+        <div className="flex items-center gap-2 font-mono">
+          <span className="text-xs text-slate-400 flex items-center gap-1 font-semibold">
+            <Sliders className="h-3 w-3 text-precursor-cyan" />
             <span>Simulate Gate:</span>
           </span>
-          <div className="flex rounded-lg border border-violet-800/60 bg-navy-950 p-0.5">
+          <div className="flex rounded-lg border border-white/[0.1] bg-precursor-surface p-0.5">
             {(['PREDICT', 'DEGRADED', 'ABSTAIN'] as GateState[]).map((state) => (
               <button
                 key={state}
                 onClick={() => onGateStateChange(state)}
-                className={`rounded px-2.5 py-1 text-xs font-mono font-bold transition ${
+                className={`rounded-md px-2.5 py-1 text-xs font-bold transition ${
                   activeGateState === state
                     ? state === 'PREDICT'
-                      ? 'bg-emerald-500 text-navy-950 shadow-sm'
+                      ? 'bg-emerald-500 text-navy-950 shadow-glow-teal'
                       : state === 'DEGRADED'
-                      ? 'bg-amber-500 text-navy-950 shadow-sm'
-                      : 'bg-rose-500 text-white shadow-sm'
+                      ? 'bg-amber-500 text-navy-950 shadow-glow-amber'
+                      : 'bg-rose-500 text-white shadow-glow-coral'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >

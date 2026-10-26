@@ -42,10 +42,10 @@ export const IncidentList: React.FC<IncidentListProps> = ({
           <div
             key={inc.id}
             onClick={() => onSelectIncident(inc.id)}
-            className={`group relative flex cursor-pointer flex-col justify-between rounded-xl border p-4 backdrop-blur-md transition-all duration-200 ${
+            className={`group relative flex cursor-pointer flex-col justify-between rounded-xl border p-4 backdrop-blur-xl transition-all duration-200 shadow-glass-panel ${
               isSelected
-                ? 'border-purple-500 bg-navy-800/90 shadow-[0_0_15px_rgba(155,123,255,0.18)] ring-1 ring-purple-500/50'
-                : 'border-violet-900/40 bg-navy-900/60 hover:border-violet-700 hover:bg-navy-800/50'
+                ? 'border-precursor-purple/70 bg-precursor-card-glass shadow-glow-purple/20 ring-1 ring-precursor-purple/40'
+                : 'border-white/[0.08] bg-precursor-card-glass hover:border-precursor-purple/40 hover:bg-precursor-surface/60'
             }`}
           >
             {/* Top row: ID, Status, Severity, Timestamp */}
