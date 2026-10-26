@@ -130,3 +130,61 @@ Evaluates metrics by horizon (5m, 15m, 30m) for **GATE ON** vs **GATE OFF**:
 1. **Ollama Offline**: When local Ollama (`http://localhost:11434`) is unreachable or times out ($> 6.0\text{s}$), the Copilot automatically switches to `offline_heuristic_fallback`. Markdown runbook guidance and numerical claim verification remain 100% functional.
 2. **Missing / Stale Telemetry**: Missing samples are tagged with `MetricQuality.MISSING` or `STALE` and trigger gate degradation or abstention with audit trails.
 3. **Execution Platform**: Compatible with rootless Podman execution via `systemd-run` and the cached `nix develop` devshell.
+
+---
+
+## 5. Telemetry Storage & Run Archive Export Contract
+
+### 5.1 Tabular Telemetry CSV Schema
+Exports bounded time-series observations in a consistent, RFC 4180 compliant schema:
+- `timestamp_iso`: ISO 8601 UTC string (e.g. `2026-10-26T08:30:00.000Z`)
+- `timestamp_epoch`: Unix epoch seconds float (`1730000000.000`)
+- `node_id`: Node / host identifier (`gateway-01`)
+- `interface_id`: Interface identifier (`eth0`)
+- `metric_id`: Telemetry metric key (`latency_ms`, `throughput_mbps`, `packet_loss_pct`, `jitter_ms`, `drops_in`, `link_state`)
+- `value`: Numeric reading (empty string if missing)
+- `unit`: Canonical unit (`ms`, `%`, `Mbps`, `packets`, `state`)
+- `quality`: Observation quality flag (`good`, `missing`, `stale`, `invalid`)
+- `source`: Observation source (`synthetic`, `live`)
+- `labels_json`: JSON-serialized key-value metadata tags
+
+### 5.2 Structured Run Archive JSON Schema
+Self-contained, nested archive preserving complete state across the simulation run:
+```json
+{
+  "metadata": {
+    "run_id": "run_gradual_degradation_seed42_1730000125",
+    "scenario_type": "gradual_degradation",
+    "seed": 42,
+    "interface_id": "eth0",
+    "node_id": "gateway-01",
+    "start_time_epoch": 1730000000.0,
+    "start_time_iso": "2026-10-26T08:30:00.000Z",
+    "end_time_epoch": 1730000125.0,
+    "end_time_iso": "2026-10-26T08:32:05.000Z",
+    "total_steps": 25,
+    "duration_seconds": 125.0,
+    "created_at_utc": "2026-10-26T09:20:00.000Z"
+  },
+  "fault_events": [...],
+  "telemetry_summary": {...},
+  "telemetry_points": [...],
+  "gate_decisions": [...],
+  "predictions": [...],
+  "incidents": [...],
+  "copilot_records": [...],
+  "evaluation_results": {...}
+}
+```
+
+### 5.3 Local Filesystem Persistence
+- Run archives: `data/runs/<run_id>.json`
+- Telemetry CSV exports: `data/exports/<run_id>_telemetry.csv`
+- Zero external database required.
+
+### 5.4 REST API Export Endpoints
+- `GET /api/export/csv`: Streams current telemetry buffer as CSV attachment.
+- `GET /api/export/json`: Returns complete nested `RunArchive` as JSON attachment.
+- `GET /api/runs`: Lists saved run archives with metadata summary.
+- `GET /api/runs/<run_id>`: Retrieves a saved run archive.
+- `POST /api/runs/save`: Persists the active run to local storage.

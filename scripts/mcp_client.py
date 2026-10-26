@@ -105,51 +105,7 @@ class MCPClient:
     def call_tool(self, tool_name, arguments=None):
         if arguments is None:
             arguments = {}
-
-        # Handle send_message with dual delivery to target and legacy alias for backward compatibility
-        if tool_name == "send_message":
-            target = arguments.get("to", "")
-            targets = ALIAS_MAP.get(target, [target])
-            results = []
-            for t in targets:
-                args_copy = dict(arguments)
-                args_copy["to"] = t
-                res = self._raw_call_tool(tool_name, args_copy)
-                results.append(res)
-            return results[0] if len(results) == 1 else {"status": "sent", "targets": targets, "results": results}
-
-        # Handle read_messages with legacy alias aggregation
-        if tool_name == "read_messages":
-            primary_res = self._raw_call_tool(tool_name, arguments)
-            all_messages = []
-            seen_ids = set()
-            if isinstance(primary_res, dict) and "messages" in primary_res:
-                for m in primary_res["messages"]:
-                    mid = m.get("id")
-                    if mid not in seen_ids:
-                        seen_ids.add(mid)
-                        all_messages.append(m)
-
-            # If this is the primary agent C, also check legacy antigravity mailbox
-            if self.agent_name == CALLSIGN_SELF:
-                try:
-                    legacy_client = MCPClient(agent_name=CALLSIGN_SELF_LEGACY, session_label=f"{CALLSIGN_SELF_LEGACY}-legacy")
-                    legacy_res = legacy_client._raw_call_tool(tool_name, arguments)
-                    if isinstance(legacy_res, dict) and "messages" in legacy_res:
-                        for m in legacy_res["messages"]:
-                            mid = m.get("id")
-                            if mid not in seen_ids:
-                                seen_ids.add(mid)
-                                all_messages.append(m)
-                except Exception:
-                    pass
-
-            if isinstance(primary_res, dict):
-                primary_res["messages"] = all_messages
-                primary_res["total"] = len(all_messages)
-                return primary_res
-            return primary_res
-
+        # Direct single invocation with zero dual-delivery spam
         return self._raw_call_tool(tool_name, arguments)
 
 

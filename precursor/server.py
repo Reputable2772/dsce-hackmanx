@@ -167,6 +167,38 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
                 result = self.engine.run_paired_evaluation(target_sc, seed=self.engine.seed)
                 self._send_json(200, result.model_dump())
 
+            elif path == "/api/export/csv":
+                csv_text = self.engine.export_telemetry_csv()
+                payload = csv_text.encode("utf-8")
+                self.send_response(200)
+                self._set_cors_headers("text/csv; charset=utf-8")
+                self.send_header("Content-Disposition", 'attachment; filename="precursor_telemetry.csv"')
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+            elif path == "/api/export/json":
+                archive = self.engine.build_run_archive()
+                payload = archive.model_dump_json(indent=2).encode("utf-8")
+                self.send_response(200)
+                self._set_cors_headers("application/json")
+                self.send_header("Content-Disposition", 'attachment; filename="precursor_run_archive.json"')
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+            elif path == "/api/runs":
+                runs = self.engine.storage_manager.list_saved_runs()
+                self._send_json(200, {"total": len(runs), "runs": runs})
+
+            elif path.startswith("/api/runs/"):
+                run_id = path.replace("/api/runs/", "").strip()
+                archive = self.engine.storage_manager.load_run(run_id)
+                if archive:
+                    self._send_json(200, archive.model_dump())
+                else:
+                    self._send_json(404, {"error": "Run archive not found", "run_id": run_id})
+
             else:
                 self._send_json(404, {"error": "Endpoint not found", "path": path})
 
@@ -225,6 +257,16 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
                         "model_used": "offline_heuristic_fallback",
                     }
                 self._send_json(200, resp_dict)
+
+            elif path in ("/api/runs/save", "/api/save"):
+                export_csv = bool(body.get("export_csv", True))
+                paths = self.engine.save_run(export_csv=export_csv)
+                self._send_json(200, {
+                    "status": "saved",
+                    "run_id": paths.get("run_id"),
+                    "json_path": paths.get("json_path"),
+                    "csv_path": paths.get("csv_path"),
+                })
 
             else:
                 self._send_json(404, {"error": "Endpoint not found", "path": path})

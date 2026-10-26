@@ -6,6 +6,7 @@ and headless evaluation pipelines.
 
 import sys
 import argparse
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 import numpy as np
 from pydantic import BaseModel, Field
@@ -27,6 +28,15 @@ from precursor.copilot.runbook_matcher import RunbookMatcher
 from precursor.copilot.llm_client import OllamaCopilot, CopilotResponse
 from precursor.evaluation.benchmark import PairedBenchmarkRunner
 from precursor.evaluation.metrics import ScenarioComparisonResult
+from precursor.storage import (
+    RunArchive,
+    RunMetadata,
+    FaultEventRecord,
+    export_telemetry_to_csv,
+    export_run_to_json,
+    RunStorageManager,
+    format_utc_iso,
+)
 
 
 class SystemSnapshot(BaseModel):
@@ -70,6 +80,9 @@ class PrecursorEngine:
         self.generator = SyntheticTelemetryGenerator(self.config)
 
         self.last_snapshot: Optional[SystemSnapshot] = None
+        self.snapshot_history: List[SystemSnapshot] = []
+        self.last_evaluation: Optional[ScenarioComparisonResult] = None
+        self.storage_manager = RunStorageManager()
 
     def reset_scenario(self, scenario_type: ScenarioType, seed: int = 42):
         """Switch to a new synthetic scenario and reset the internal buffer."""
@@ -79,6 +92,8 @@ class PrecursorEngine:
         self.generator = SyntheticTelemetryGenerator(self.config)
         self.buffer.clear()
         self.last_snapshot = None
+        self.snapshot_history.clear()
+        self.last_evaluation = None
 
     def ingest_points(self, points: List[TelemetryPoint]) -> SystemSnapshot:
         """Ingest live or external points and compute the full state pipeline."""
@@ -140,11 +155,105 @@ class PrecursorEngine:
             copilot_response=copilot_response,
         )
         self.last_snapshot = snapshot
+        self.snapshot_history.append(snapshot)
+        if len(self.snapshot_history) > 1000:
+            self.snapshot_history.pop(0)
         return snapshot
 
     def run_paired_evaluation(self, scenario_type: ScenarioType, seed: int = 42) -> ScenarioComparisonResult:
         """Run paired comparison GATE ON vs GATE OFF on the requested scenario."""
-        return self.evaluator.run_scenario(scenario_type=scenario_type, seed=seed)
+        comp = self.evaluator.run_scenario(scenario_type=scenario_type, seed=seed)
+        self.last_evaluation = comp
+        return comp
+
+    def build_run_archive(self) -> RunArchive:
+        """Construct a complete, nested RunArchive from current simulation state."""
+        t_end = self.buffer.get_latest_timestamp() or self.config.start_timestamp
+        gt = self.generator.ground_truth
+
+        # Format fault event record
+        fault_records = [
+            FaultEventRecord(
+                scenario_type=gt.scenario_type.value,
+                impact_start_seconds=gt.impact_start_seconds,
+                impact_end_seconds=gt.impact_end_seconds,
+                impact_metric=gt.impact_metric,
+                sla_breach_threshold=gt.sla_breach_threshold,
+                description=gt.description,
+            )
+        ]
+
+        # Metadata
+        created_iso = format_utc_iso(datetime.now(timezone.utc).timestamp())
+        run_id = f"run_{self.scenario_type.value}_seed{self.seed}_{int(t_end)}"
+        meta = RunMetadata(
+            run_id=run_id,
+            scenario_type=self.scenario_type.value,
+            seed=self.seed,
+            interface_id=self.interface_id,
+            node_id="gateway-01",
+            start_time_epoch=self.config.start_timestamp,
+            start_time_iso=format_utc_iso(self.config.start_timestamp),
+            end_time_epoch=t_end,
+            end_time_iso=format_utc_iso(t_end),
+            total_steps=len(self.snapshot_history),
+            duration_seconds=round(max(0.0, t_end - self.config.start_timestamp), 2),
+            created_at_utc=created_iso,
+        )
+
+        # Extract all telemetry points from buffer
+        points = list(self.buffer._buffer)
+
+        # Timelines
+        gate_timeline = [s.gate_decision.model_dump() for s in self.snapshot_history]
+        preds_timeline = [
+            {
+                "timestamp": s.timestamp,
+                "horizons": {str(h): [r.model_dump() for r in res] for h, res in s.detector_results.items()},
+            }
+            for s in self.snapshot_history
+        ]
+        incidents_timeline = [
+            {"timestamp": s.timestamp, "incidents": [i.model_dump() for i in s.incidents]}
+            for s in self.snapshot_history
+            if s.incidents
+        ]
+        copilot_records = [
+            {"timestamp": s.timestamp, "response": s.copilot_response.model_dump()}
+            for s in self.snapshot_history
+            if s.copilot_response
+        ]
+
+        eval_data = None
+        if self.last_evaluation:
+            eval_data = self.last_evaluation.model_dump()
+
+        return RunArchive(
+            metadata=meta,
+            fault_events=fault_records,
+            telemetry_summary=self.buffer.quality_stats(current_time=t_end),
+            telemetry_points=points,
+            gate_decisions=gate_timeline,
+            predictions=preds_timeline,
+            incidents=incidents_timeline,
+            copilot_records=copilot_records,
+            evaluation_results=eval_data,
+        )
+
+    def export_telemetry_csv(self, file_path: Optional[str] = None) -> str:
+        """Export all current telemetry buffer observations to standard CSV."""
+        points = list(self.buffer._buffer)
+        return export_telemetry_to_csv(points, file_path=file_path)
+
+    def export_run_json(self, file_path: Optional[str] = None) -> str:
+        """Export complete execution run archive to formatted JSON."""
+        archive = self.build_run_archive()
+        return export_run_to_json(archive, file_path=file_path)
+
+    def save_run(self, export_csv: bool = True) -> Dict[str, str]:
+        """Persist current run locally in data/runs/ and data/exports/."""
+        archive = self.build_run_archive()
+        return self.storage_manager.save_run(archive, export_csv=export_csv)
 
 
 def main():
