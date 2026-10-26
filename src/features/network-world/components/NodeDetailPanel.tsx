@@ -47,6 +47,7 @@ export const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({
   const nodeMap = new Map(allNodes.map((n) => [n.id, n]));
 
   const isLocalHost = selectedNode?.id === 'local-host';
+  const isLiveProbe = !!selectedNode?.id?.startsWith('target-') || !!selectedNode?.metadata?.role?.toLowerCase().includes('live probe') || !!selectedNode?.metadata?.role?.toLowerCase().includes('active target');
   const isPeerNode = isPeerTopology || (selectedNode?.type === 'endpoint' && selectedNode.metadata.role?.includes('Peer'));
   const isLiveTarget =
     Boolean(selectedNode?.id?.startsWith('target-')) ||
@@ -144,10 +145,10 @@ export const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({
               <span>ID: <span className="text-[#5267D8] font-semibold">{selectedNode.id}</span></span>
               <span>•</span>
               <span className="inline-flex items-center gap-1">
-                {isLiveTarget ? (
+                {isLiveTarget || isLiveProbe ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-mono font-bold text-emerald-800 shadow-xs animate-pulse">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
-                    LIVE TARGET
+                    LIVE PROBE TARGET
                   </span>
                 ) : isLocalHost ? (
                   <span className="rounded bg-indigo-50 text-[#5267D8] px-1.5 py-0.5 text-[10px] font-semibold">

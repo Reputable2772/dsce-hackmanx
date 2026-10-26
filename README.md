@@ -3,7 +3,7 @@
 > **Reliability-Gated Early Warning & Root-Cause Copilot for Critical Network Infrastructure**
 
 [![Nix Flake](https://img.shields.io/badge/nix-flake%20ready-blue.svg)](./flake.nix)
-[![Tests](https://img.shields.io/badge/tests-62%2F62%20passing-brightgreen.svg)](./tests/)
+[![Tests](https://img.shields.io/badge/tests-66%2F66%20passing-brightgreen.svg)](./tests/)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.14-blue.svg)](./requirements.txt)
 [![React](https://img.shields.io/badge/react-19-61dafb.svg)](./package.json)
 [![Three.js](https://img.shields.io/badge/three.js-3D%20topology-black.svg)](./src/)
@@ -18,8 +18,9 @@ Unlike traditional monitoring tools that generate false alarm fatigue or black-b
 1. **Multi-Horizon Early Warnings**: Forecasts metric breaches at **+5m, +15m, and +30m** horizons before SLAs drop.
 2. **Tri-State Reliability Gate**: Dynamically evaluates sensor health, Kolmogorov-Smirnov distribution drift, and residual variance expansion to gate predictions (`PREDICT`, `DEGRADED`, `ABSTAIN`).
 3. **Zero-Latency Immediate Invariant**: Hard physical faults (e.g., link-down, 100% loss) bypass model gates immediately.
-4. **Audited AI Copilot**: Grounded in 9 bundled network runbooks with regex-based numerical claim verification against real-time telemetry ($\pm 10\%$ tolerance).
+4. **Audited AI Copilot**: Grounded in 9 bundled operational runbooks with strict JSON output, structured hypotheses, testable operational assumptions (`VALIDATED`, `VIOLATED`, `UNTESTABLE`), and numerical claim verification ($\pm 10\%$ tolerance).
 5. **Dual Operation Mode**: Seamless switching between live Linux socket/interface polling and reproducible synthetic scenarios.
+6. **100% Full Feature Parity**: Deep packet capture forensics, custom telemetry injection presets, simulation timeline fast-forwarding, dynamic SLA threshold overrides, and an offline runbook library browser.
 
 ---
 
@@ -73,10 +74,11 @@ Regulates predictive alerts according to input data trustworthiness:
 * **`ABSTAIN`**: Severe sensor corruption ($> 50\%$ missing/stale/invalid). Predictive warnings are suppressed to prevent false alarms.
 * **Safety Invariant**: `immediate_alerts_active = True` in all states.
 
-### 3. Grounded Copilot & Claim Verification ([`precursor/copilot/`](./precursor/copilot/))
+### 3. Grounded Copilot & Assumption Auditing ([`precursor/copilot/`](./precursor/copilot/))
 * **Local Offline Execution**: Connects to local Ollama (`llama3.2:1b`) with automated deterministic fallback.
-* **9 Bundled Runbooks**: Covers bufferbloat, transceiver degradation, routing flaps, link flapping, MTU blackholes, and QoS throttling.
-* **Numerical Claim Verifier** ([`claim_verifier.py`](./precursor/copilot/claim_verifier.py)): Uses regex parsing to extract LLM assertions (e.g. latency, packet loss, drops) and audits them against the ground-truth snapshot within $\pm 10\%$ tolerance (`VERIFIED`, `CONTRADICTED`, `UNVERIFIED`).
+* **Strict JSON Schema (`CopilotStrictJSON`)**: Enforces structured synthesis comprising natural language summary, hypotheses list, testable operational assumptions, copyable diagnostic commands, and rollback guidance.
+* **Assumption & Claim Verifier** ([`claim_verifier.py`](./precursor/copilot/claim_verifier.py)): Evaluates operational assumptions against ground-truth telemetry with mathematical predicates (`metric_id`, `operator`, `expected_value`) to yield `VALIDATED`, `VIOLATED`, or `UNTESTABLE` statuses, plus numerical claim tolerance auditing ($\pm 10\%$).
+* **9 Bundled Operational Runbooks**: Full Markdown procedures covering latency/jitter bufferbloat, interface degradation, packet loss, routing flap, congestion, connectivity blackholes, sensor corruption, MTU fragmentation, and post-incident gate recovery.
 
 ### 4. Live Linux Network Telemetry ([`precursor/telemetry/live_collector.py`](./precursor/telemetry/live_collector.py))
 Measures active network interface parameters:
@@ -84,6 +86,13 @@ Measures active network interface parameters:
 * **Jitter**: Rolling delta of consecutive RTT probes.
 * **Packet Loss**: Connection reachability and timeout ratios.
 * **Interface Counters**: Reads `/proc/net/dev` for `throughput_mbps`, `drops_in`, and interface carrier status.
+
+### 5. Forensics, Dynamic Ingestion & Runtime Control
+* **Granular Packet Forensics** ([`PacketForensicsTab.tsx`](./src/features/incidents/components/PacketForensicsTab.tsx)): Dissects sampled incident packets (TCP/UDP/ICMP/IP) with protocol filtering, raw layer headers, and JSON export.
+* **Custom Telemetry Ingest** ([`CustomIngestModal.tsx`](./src/features/telemetry/components/CustomIngestModal.tsx)): Allows operators to inject custom telemetry points with one-click anomaly presets (*Severe Latency Spike*, *Packet Loss Burst*, *Jitter Storm*, *Degraded Sensor*).
+* **Simulation Fast-Forward**: Advances time by $+15\text{s}, +1\text{m}, +5\text{m}, +15\text{m}$ to inspect dynamic horizon transitions.
+* **Detection & Gate Threshold Overrides** ([`ThresholdsSettingsSection.tsx`](./src/features/settings/components/ThresholdsSettingsSection.tsx)): Allows runtime tuning of SLA limits (RTT, Loss, Jitter) and Gate KS drift significance ($\alpha$).
+* **Runbook Library Browser** ([`RunbookLibrarySection.tsx`](./src/features/copilot/components/RunbookLibrarySection.tsx)): Air-gapped visual catalog of all 9 operational runbooks with tag search and copyable diagnostic commands.
 
 ---
 
@@ -166,6 +175,10 @@ The backend exposes an asynchronous REST API on port `8000`:
 | `GET` | `/api/incidents/{id}/packets` | Granular forensic packet sampling (TCP/UDP/ICMP/IP/ETH) |
 | `POST` | `/api/incidents/{id}/status` | Update incident lifecycle status (`OPEN`, `INVESTIGATING`, `RESOLVED`) |
 | `POST` | `/api/copilot/query` | User-triggered Copilot query with instant overview and deep LLM hypothesis |
+| `GET` | `/api/runbooks` | Catalog of all 9 operational network runbooks |
+| `GET` | `/api/runbooks/{id}` | Fetch individual runbook Markdown procedure |
+| `GET` | `/api/config` | Read runtime SLA and reliability gate configuration |
+| `PATCH` | `/api/config` | Update dynamic SLA thresholds and Gate alpha level |
 | `GET` | `/api/evaluation` | Counterfactual paired benchmark evaluation (`gate_on` vs `gate_off`) |
 | `GET` | `/api/export/csv` | Download active telemetry stream as RFC 4180 CSV |
 | `GET` | `/api/export/json` | Download structured nested run archive JSON |
@@ -187,7 +200,8 @@ The backend exposes an asynchronous REST API on port `8000`:
 | [`test_systems_api.py`](./tests/test_systems_api.py) | 6 | **PASSED** | Peer registration, live health probing, dynamic system inventory CRUD |
 | [`test_simulation_scenarios.py`](./tests/test_simulation_scenarios.py) | 5 | **PASSED** | Bufferbloat, link cut immediate alert, sensor drift KS test, dual-stage Copilot, custom telemetry injection |
 | [`test_simulation_advanced_situations.py`](./tests/test_simulation_advanced_situations.py) | 5 | **PASSED** | Scenario transitions across all modes, multi-node telemetry discovery, packet fidelity, counterfactual API, 404 validation |
-| **Total** | **62** | **100%** | All 11 test suites passing |
+| [`test_parity_endpoints.py`](./tests/test_parity_endpoints.py) | 4 | **PASSED** | Simulation fast-forward, SLA & Gate threshold overrides, custom telemetry ingestion, runbooks list |
+| **Total** | **66** | **100%** | All 12 test suites passing |
 
 ---
 

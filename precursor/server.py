@@ -724,21 +724,23 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
                     self._send_json(404, {"error": "Evaluation run not found", "evaluation_id": eval_id})
 
             elif norm_path == "/api/config":
+                sla_thresholds = getattr(self.engine, "sla_thresholds", {
+                    "latency_ms": 60.0,
+                    "packet_loss_pct": 2.0,
+                    "jitter_ms": 10.0,
+                })
+                reliability_gate = getattr(self.engine, "reliability_gate_config", {
+                    "drift_alpha": 0.05,
+                    "min_points": 15,
+                    "abstain_on_sensor_failure": True,
+                })
                 self._send_json(200, {
                     "scenario": self.engine.scenario_type.value,
                     "seed": self.engine.seed,
                     "mode": getattr(self.engine, "mode", "synthetic"),
                     "interface_id": self.engine.interface_id,
-                    "sla_thresholds": {
-                        "latency_ms": 60.0,
-                        "packet_loss_pct": 2.0,
-                        "jitter_ms": 10.0,
-                    },
-                    "reliability_gate": {
-                        "drift_alpha": 0.05,
-                        "min_points": 15,
-                        "abstain_on_sensor_failure": True,
-                    },
+                    "sla_thresholds": sla_thresholds,
+                    "reliability_gate": reliability_gate,
                     "horizons_minutes": [5, 15, 30],
                     "sampling_interval_seconds": 5.0,
                 })
@@ -1006,6 +1008,18 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
                     "incident_count": len(snapshot.incidents),
                 })
 
+            elif norm_path in ("/api/fast_forward", "/api/simulation/fast_forward"):
+                seconds = float(body.get("seconds", 60.0))
+                snapshot = self.engine.fast_forward(seconds)
+                self._send_json(200, {
+                    "status": "fast_forwarded",
+                    "advanced_seconds": seconds,
+                    "timestamp": snapshot.timestamp,
+                    "gate_state": snapshot.gate_decision.state.value,
+                    "latest_metrics": snapshot.latest_telemetry,
+                    "incident_count": len(snapshot.incidents),
+                })
+
             elif norm_path in ("/api/simulation/start",):
                 steps = max(1, int(body.get("steps", 5)))
                 for _ in range(steps):
@@ -1151,12 +1165,41 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
                     self.engine.set_mode(body["mode"])
                 if "interface_id" in body:
                     self.engine.interface_id = str(body["interface_id"])
+                if "sla_thresholds" in body and isinstance(body["sla_thresholds"], dict):
+                    if not hasattr(self.engine, "sla_thresholds"):
+                        self.engine.sla_thresholds = {
+                            "latency_ms": 60.0,
+                            "packet_loss_pct": 2.0,
+                            "jitter_ms": 10.0,
+                        }
+                    self.engine.sla_thresholds.update(body["sla_thresholds"])
+                if "reliability_gate" in body and isinstance(body["reliability_gate"], dict):
+                    if not hasattr(self.engine, "reliability_gate_config"):
+                        self.engine.reliability_gate_config = {
+                            "drift_alpha": 0.05,
+                            "min_points": 15,
+                            "abstain_on_sensor_failure": True,
+                        }
+                    self.engine.reliability_gate_config.update(body["reliability_gate"])
+
+                sla_thresholds = getattr(self.engine, "sla_thresholds", {
+                    "latency_ms": 60.0,
+                    "packet_loss_pct": 2.0,
+                    "jitter_ms": 10.0,
+                })
+                reliability_gate = getattr(self.engine, "reliability_gate_config", {
+                    "drift_alpha": 0.05,
+                    "min_points": 15,
+                    "abstain_on_sensor_failure": True,
+                })
                 self._send_json(200, {
                     "status": "updated",
                     "scenario": self.engine.scenario_type.value,
                     "seed": self.engine.seed,
                     "mode": getattr(self.engine, "mode", "synthetic"),
                     "interface_id": self.engine.interface_id,
+                    "sla_thresholds": sla_thresholds,
+                    "reliability_gate": reliability_gate,
                 })
 
             elif norm_path in ("/api/runs/save", "/api/save"):

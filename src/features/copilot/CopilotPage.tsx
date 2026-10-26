@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Bot, Scale } from 'lucide-react';
+import { Bot, Scale, BookOpen } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { CopilotWorkspace } from './components/CopilotWorkspace';
 import { ClaimVerificationSection } from './components/ClaimVerificationSection';
+import { RunbookLibrarySection } from './components/RunbookLibrarySection';
 
 export const CopilotPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'workspace' | 'verifier'>('workspace');
+  const [activeTab, setActiveTab] = useState<'workspace' | 'verifier' | 'runbooks'>('workspace');
 
   return (
     <PageContainer
@@ -45,6 +46,25 @@ export const CopilotPage: React.FC = () => {
               VERIFIED / CONTRADICTED
             </span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('runbooks')}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-mono font-bold transition ${
+              activeTab === 'runbooks'
+                ? 'bg-[#5267D8] text-white shadow-xs'
+                : 'text-[#687386] hover:text-[#202938]'
+            }`}
+          >
+            <BookOpen className="h-4 w-4" />
+            <span>Runbook Library</span>
+            <span className={`rounded px-1.5 py-0.2 text-[9px] font-bold border ${
+              activeTab === 'runbooks'
+                ? 'bg-white/20 text-white border-white/30'
+                : 'bg-indigo-50 text-[#5267D8] border-indigo-200'
+            }`}>
+              9 RUNBOOKS
+            </span>
+          </button>
         </div>
 
         {/* Tab 1: Copilot Workspace */}
@@ -52,6 +72,9 @@ export const CopilotPage: React.FC = () => {
 
         {/* Tab 2: Numerical Claim Verifier */}
         {activeTab === 'verifier' && <ClaimVerificationSection />}
+
+        {/* Tab 3: Runbook Library */}
+        {activeTab === 'runbooks' && <RunbookLibrarySection />}
       </div>
     </PageContainer>
   );

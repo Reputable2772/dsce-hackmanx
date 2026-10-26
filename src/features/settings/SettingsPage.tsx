@@ -12,6 +12,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useAppStore } from '@/stores/useAppStore';
 import { apiClient } from '@/lib/api';
+import { ThresholdsSettingsSection } from './components/ThresholdsSettingsSection';
 
 export const SettingsPage: React.FC = () => {
   const connectionState = useAppStore((s) => s.connectionState);
@@ -371,6 +372,9 @@ export const SettingsPage: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Section: Operational Engine Detection & SLA Thresholds */}
+        <ThresholdsSettingsSection isConnected={isConnected} />
 
         {/* Section 4: Storage & Reset Boundaries */}
         <div className="rounded-xl border border-[#E3E8F0] bg-white p-6 shadow-sm">

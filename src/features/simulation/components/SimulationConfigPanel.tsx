@@ -13,13 +13,17 @@ import {
   Globe, 
   RefreshCw, 
   CheckCircle2, 
-  Pause
+  Pause,
+  FastForward
 } from 'lucide-react';
 import { useSimulationStore } from '../useSimulationStore';
 import { useAppStore } from '@/stores/useAppStore';
+import { apiClient } from '@/lib/api';
 
 export const SimulationConfigPanel: React.FC = () => {
   const isConnected = useAppStore((s) => s.connectionState) === 'connected';
+  const [fastForwarding, setFastForwarding] = useState<number | null>(null);
+  const [ffMessage, setFfMessage] = useState<string | null>(null);
   const {
     operatingMode,
     targetHost,
@@ -107,6 +111,20 @@ export const SimulationConfigPanel: React.FC = () => {
       });
     } catch {
       setActiveMode('synthetic');
+    }
+  };
+
+  const handleFastForward = async (seconds: number) => {
+    setFastForwarding(seconds);
+    setFfMessage(null);
+    try {
+      const res = await apiClient.fastForward(seconds);
+      setFfMessage(`Advanced timeline +${seconds}s (Gate: ${res.gate_state || 'STABLE'})`);
+      useAppStore.getState().checkLiveConnection();
+    } catch (err: any) {
+      setFfMessage(`Fast-forward failed: ${err.message}`);
+    } finally {
+      setFastForwarding(null);
     }
   };
 
@@ -448,6 +466,44 @@ export const SimulationConfigPanel: React.FC = () => {
           <span>{feedback.message}</span>
         </div>
       )}
+
+      {/* Simulation Fast-Forward Controls */}
+      <div className="mt-5 border-t border-[#E3E8F0] pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 font-mono text-xs font-semibold text-[#687386]">
+            <FastForward className="h-3.5 w-3.5 text-[#5267D8]" />
+            <span>Timeline Fast-Forward:</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {[
+              { label: '+15s', sec: 15 },
+              { label: '+1m', sec: 60 },
+              { label: '+5m', sec: 300 },
+              { label: '+15m', sec: 900 },
+            ].map((p) => (
+              <button
+                key={p.sec}
+                type="button"
+                onClick={() => handleFastForward(p.sec)}
+                disabled={fastForwarding !== null || !isConnected}
+                className="rounded-lg border border-[#CBD5E1] bg-white px-2.5 py-1 font-mono text-xs font-semibold text-[#202938] hover:border-[#5267D8] hover:text-[#5267D8] transition disabled:opacity-50 cursor-pointer"
+              >
+                {fastForwarding === p.sec ? 'Jumping...' : p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {ffMessage && (
+          <p className="mt-2 text-xs font-mono text-emerald-600">
+            {ffMessage}
+          </p>
+        )}
+      </div>
+
+      <p className="mt-3 text-[11px] text-[#687386]">
+        These controls operate the frontend demonstration experience and timeline jumps against the live PRECURSOR backend engine.
+      </p>
     </div>
   );
 };

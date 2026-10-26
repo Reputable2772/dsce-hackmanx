@@ -18,11 +18,13 @@ import {
   BarChart3,
   Terminal,
   AlertCircle,
+  FileCode,
   X
 } from 'lucide-react';
 import { IncidentRecord, IncidentStatus } from '../types';
 import { useAppStore } from '@/stores/useAppStore';
 import { apiClient } from '@/lib/api';
+import { PacketForensicsTab } from './PacketForensicsTab';
 
 interface IncidentDetailPanelProps {
   incident: IncidentRecord;
@@ -50,7 +52,7 @@ export const IncidentDetailPanel: React.FC<IncidentDetailPanelProps> = ({
   const hypotheses = Array.isArray(incident.hypotheses) ? incident.hypotheses : [];
   const timeline = Array.isArray(incident.timeline) ? incident.timeline : [];
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'telemetry' | 'gate' | 'copilot' | 'timeline'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'telemetry' | 'packets' | 'gate' | 'copilot' | 'timeline'>('overview');
   const [currentStatus, setCurrentStatus] = useState<IncidentStatus>(incident.status || 'OPEN');
   const [isUpdating, setIsUpdating] = useState(false);
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
@@ -279,6 +281,17 @@ export const IncidentDetailPanel: React.FC<IncidentDetailPanelProps> = ({
         >
           <BarChart3 className="h-3.5 w-3.5" />
           <span>Telemetry ({evidence.length})</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('packets')}
+          className={`flex items-center gap-1.5 border-b-2 px-3.5 py-2 font-semibold transition ${
+            activeTab === 'packets'
+              ? 'border-[#5267D8] text-[#5267D8]'
+              : 'border-transparent hover:border-slate-300 hover:text-[#202938]'
+          }`}
+        >
+          <FileCode className="h-3.5 w-3.5" />
+          <span>Packet Forensics</span>
         </button>
         <button
           onClick={() => setActiveTab('gate')}
@@ -541,6 +554,11 @@ export const IncidentDetailPanel: React.FC<IncidentDetailPanelProps> = ({
             </div>
           )}
         </div>
+      )}
+
+      {/* TAB: PACKET FORENSICS */}
+      {activeTab === 'packets' && (
+        <PacketForensicsTab incidentId={incident.id} />
       )}
 
       {/* TAB 3: GATE & PREDICTIONS */}

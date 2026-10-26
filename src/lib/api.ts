@@ -16,6 +16,7 @@ export interface BackendHealthResponse {
 }
 
 export interface BackendStatusResponse {
+  mode?: 'synthetic' | 'live';
   scenario: string;
   timestamp: number;
   gate_state: 'PREDICT' | 'DEGRADED' | 'ABSTAIN';
@@ -584,6 +585,38 @@ export class PrecursorApiClient {
     });
     if (!res.ok) {
       throw new Error(`Mark all notifications read failed with status ${res.status}`);
+    }
+    return res.json();
+  }
+
+  public async fetchIncidentPackets(incidentId: string, limit: number = 50): Promise<{ incident_id: string; count: number; packets: any[] }> {
+    const res = await fetch(`${this.config.baseUrl}/api/incidents/${encodeURIComponent(incidentId)}/packets?limit=${limit}`);
+    if (!res.ok) {
+      throw new Error(`Incident packets fetch failed with status ${res.status}`);
+    }
+    return res.json();
+  }
+
+  public async ingestTelemetry(points: any[]): Promise<any> {
+    const res = await fetch(`${this.config.baseUrl}/api/telemetry/ingest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ points }),
+    });
+    if (!res.ok) {
+      throw new Error(`Telemetry ingest failed with status ${res.status}`);
+    }
+    return res.json();
+  }
+
+  public async fastForward(seconds: number = 60.0): Promise<any> {
+    const res = await fetch(`${this.config.baseUrl}/api/fast_forward`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seconds }),
+    });
+    if (!res.ok) {
+      throw new Error(`Fast forward failed with status ${res.status}`);
     }
     return res.json();
   }
