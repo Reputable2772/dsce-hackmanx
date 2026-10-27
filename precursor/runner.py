@@ -384,15 +384,29 @@ class PrecursorEngine:
             # Solution 1: Sub-5ms instant incident overview (never blocks engine or UI)
             copilot_response = self.copilot.generate_instant_overview(top_incident, latest_telem, matches)
 
-            # Solution 1: Asynchronous background Ollama LLM synthesis
+            # Solution 1: Asynchronous background LLM synthesis with cooldown guard
             target_inc_id = top_incident.id
-            if target_inc_id not in self._in_flight_incidents:
+            now_t = time.time()
+            if not hasattr(self, "_incident_last_attempt"):
+                self._incident_last_attempt = {}
+            if not hasattr(self, "_enriched_incidents"):
+                self._enriched_incidents = set()
+
+            should_enrich = (
+                target_inc_id not in self._in_flight_incidents
+                and target_inc_id not in self._enriched_incidents
+                and (now_t - self._incident_last_attempt.get(target_inc_id, 0.0)) > 60.0
+            )
+
+            if should_enrich:
                 self._in_flight_incidents.add(target_inc_id)
+                self._incident_last_attempt[target_inc_id] = now_t
 
                 def _async_enrich_worker(async_inc, async_telem, async_matches, inc_id):
                     try:
                         deep_resp = self.copilot.query_ollama(async_inc, async_telem, async_matches, timeout_seconds=60.0)
                         if deep_resp:
+                            self._enriched_incidents.add(inc_id)
                             self.incident_db.update_copilot_guidance(inc_id, deep_resp)
                             if self.last_snapshot and self.last_snapshot.incidents and self.last_snapshot.incidents[0].id == inc_id:
                                 self.last_snapshot.copilot_response = deep_resp

@@ -15,6 +15,7 @@ from precursor.copilot.claim_verifier import (
     HypothesisVerification,
     HypothesisStatus,
 )
+from precursor.copilot.groq_client import GroqClient
 from precursor.copilot.gemini_client import GeminiClient, fire_ollama_prompt_async
 
 import time
@@ -91,6 +92,7 @@ class OllamaCopilot:
         self.preferred_model = preferred_model
         self.timeout_seconds = timeout_seconds
         self.verifier = NumericalClaimVerifier(tolerance=0.10)
+        self.groq_client = GroqClient()
         self.gemini_client = GeminiClient()
         self._last_model_check: float = 0.0
         self._cached_model: Optional[str] = None
@@ -195,10 +197,10 @@ class OllamaCopilot:
         Returns CopilotResponse if successful, or None on error/timeout.
         """
         model = self._get_available_model()
-        if not model and not self.gemini_client.is_configured:
+        if not model and not self.groq_client.is_configured and not self.gemini_client.is_configured:
             return None
 
-        matched_rb_text = "\n\n".join([m.content for m in runbook_matches]) if runbook_matches else "No matching runbook."
+        matched_rb_text = "\n\n".join([m.content[:500] for m in runbook_matches]) if runbook_matches else "No matching runbook."
         telemetry_str = ", ".join([f"{k}: {v}" for k, v in telemetry_snapshot.items() if v is not None])
         t_limit = timeout_seconds or 60.0
 
@@ -240,22 +242,38 @@ MANDATORY INSTRUCTIONS:
         if model:
             fire_ollama_prompt_async(self.base_url, model, prompt)
 
-        # 2. Query Gemini API for synthesis
+        # 2. Query LLM API for synthesis (Groq prioritized, Gemini as fallback)
         parsed_strict = None
         raw_text = None
-        gemini_dict = self.gemini_client.generate_json(prompt)
+        llm_dict = None
+        llm_source = None
+
+        if self.groq_client.is_configured:
+            llm_dict = self.groq_client.generate_json(prompt)
+            if llm_dict:
+                llm_source = f"groq ({self.groq_client.model})"
+
+        if not llm_dict and self.gemini_client.is_configured:
+            llm_dict = self.gemini_client.generate_json(prompt)
+            if llm_dict:
+                llm_source = f"gemini ({self.gemini_client.model})"
 
         # 3. Simulate realistic small delay (as if local response)
         time.sleep(0.35)
 
-        if gemini_dict and isinstance(gemini_dict, dict):
+        if llm_dict and isinstance(llm_dict, dict):
+            norm_dict = {k.lower().replace(" ", "_").replace("-", "_"): v for k, v in llm_dict.items()}
             try:
-                parsed_strict = CopilotStrictJSON(**gemini_dict)
-                raw_text = json.dumps(gemini_dict, indent=2)
+                parsed_strict = CopilotStrictJSON(**norm_dict)
+                raw_text = json.dumps(norm_dict, indent=2)
             except Exception:
-                parsed_strict = None
+                try:
+                    parsed_strict = CopilotStrictJSON(**llm_dict)
+                    raw_text = json.dumps(llm_dict, indent=2)
+                except Exception:
+                    parsed_strict = None
 
-        # 4. Fallback if Gemini unconfigured or invalid output
+        # 4. Fallback if LLM unconfigured or invalid output
         if not parsed_strict:
             raw_text = self._generate_heuristic_fallback(incident, telemetry_snapshot, runbook_matches)
             try:
@@ -283,7 +301,7 @@ MANDATORY INSTRUCTIONS:
         ]
 
         # 5. Model display identifier
-        display_model = f"gemini ({self.gemini_client.model})" if gemini_dict else (f"{model} (local)" if model else "instant_heuristic_runbook")
+        display_model = llm_source if llm_dict else (f"{model} (local)" if model else "instant_heuristic_runbook")
 
         return CopilotResponse(
             summary=parsed_strict.summary,
@@ -309,7 +327,7 @@ MANDATORY INSTRUCTIONS:
         Generate grounded troubleshooting guidance enforcing strict JSON schema and dual auditing.
         If Gemini is configured, invokes Gemini for deep synthesis; otherwise returns sub-5ms instant heuristic.
         """
-        if self.gemini_client.is_configured:
+        if self.groq_client.is_configured or self.gemini_client.is_configured:
             deep_res = self.query_ollama(incident, telemetry_snapshot, runbook_matches, timeout_seconds=12.0)
             if deep_res:
                 return deep_res
@@ -329,7 +347,7 @@ MANDATORY INSTRUCTIONS:
             runbook_matches = matcher.match_text(prompt, top_k=2)
 
         model = self._get_available_model()
-        matched_rb_text = "\n\n".join([m.content for m in runbook_matches]) if runbook_matches else "No matching runbook."
+        matched_rb_text = "\n\n".join([m.content[:500] for m in runbook_matches]) if runbook_matches else "No matching runbook."
         telemetry_str = ", ".join([f"{k}: {v}" for k, v in telemetry_snapshot.items() if v is not None])
 
         llm_prompt = f"""You are PRECURSOR Network Copilot.
@@ -357,24 +375,57 @@ Format your response under these 5 headings:
         if model:
             fire_ollama_prompt_async(self.base_url, model, llm_prompt)
 
-        # 2. Query Gemini API
-        gemini_dict = self.gemini_client.generate_json(llm_prompt)
+        # 2. Query LLM API (Groq prioritized, Gemini fallback)
+        llm_dict = None
+        if self.groq_client.is_configured:
+            llm_dict = self.groq_client.generate_json(llm_prompt)
+            if llm_dict:
+                used_model = f"groq ({self.groq_client.model})"
+
+        if not llm_dict and self.gemini_client.is_configured:
+            llm_dict = self.gemini_client.generate_json(llm_prompt)
+            if llm_dict:
+                used_model = f"gemini ({self.gemini_client.model})"
 
         # 3. Simulate realistic small delay (as if local response)
         time.sleep(0.35)
 
-        if gemini_dict and isinstance(gemini_dict, dict):
-            summary = gemini_dict.get("summary", "")
-            raw_hyps = gemini_dict.get("hypotheses", [])
-            hyps = "\n".join(f"- {h.get('statement', str(h)) if isinstance(h, dict) else str(h)}" for h in raw_hyps)
-            raw_cmds = gemini_dict.get("diagnostic_commands", [])
-            cmds = "\n".join(str(c) for c in raw_cmds)
-            raw_steps = gemini_dict.get("verification_steps", [])
+        if llm_dict and isinstance(llm_dict, dict):
+            norm_dict = {re.sub(r"[^a-z]", "", k.lower()): v for k, v in llm_dict.items()}
+
+            def _to_list(val) -> List[str]:
+                if not val:
+                    return []
+                if isinstance(val, list):
+                    res = []
+                    for item in val:
+                        if isinstance(item, dict):
+                            res.append(item.get("statement", json.dumps(item)))
+                        else:
+                            res.append(str(item))
+                    return res
+                if isinstance(val, str):
+                    if "\n" in val:
+                        return [line.strip().lstrip("-*•123456789. ") for line in val.split("\n") if line.strip()]
+                    splits = re.split(r"\s*\d+\.\s+", val)
+                    cleaned = [s.strip() for s in splits if s.strip()]
+                    if len(cleaned) > 1:
+                        return cleaned
+                    if "," in val:
+                        return [s.strip() for s in val.split(",") if s.strip()]
+                    return [val.strip()]
+                return [str(val)]
+
+            summary = str(norm_dict.get("summary") or norm_dict.get("overview") or "").strip()
+            raw_hyps = _to_list(norm_dict.get("hypotheses") or norm_dict.get("hypothesis") or norm_dict.get("causes"))
+            hyps = "\n".join(f"- {h}" for h in raw_hyps)
+            raw_cmds = _to_list(norm_dict.get("diagnosticcommands") or norm_dict.get("commands") or norm_dict.get("diagnostics"))
+            cmds = "\n".join(raw_cmds)
+            raw_steps = _to_list(norm_dict.get("verificationsteps") or norm_dict.get("verifications") or norm_dict.get("steps"))
             steps = "\n".join(f"- {s}" for s in raw_steps)
-            raw_risks = gemini_dict.get("risks_and_rollback", [])
+            raw_risks = _to_list(norm_dict.get("risksandrollback") or norm_dict.get("risks") or norm_dict.get("rollback"))
             risks = "\n".join(f"- {r}" for r in raw_risks)
             raw_text = f"### Summary\n{summary}\n\n### Hypotheses\n{hyps}\n\n### Diagnostic Commands\n```bash\n{cmds}\n```\n\n### Verification Steps\n{steps}\n\n### Risks and Rollback\n{risks}\n"
-            used_model = f"gemini ({self.gemini_client.model})"
 
         if not raw_text:
             rb = runbook_matches[0] if runbook_matches else None

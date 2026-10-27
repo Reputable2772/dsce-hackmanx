@@ -10,8 +10,6 @@ from typing import Optional, Dict, Any
 
 logger = logging.getLogger("precursor.gemini")
 
-DEFAULT_GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
-
 
 def fire_ollama_prompt_async(base_url: str, model: str, prompt: str) -> None:
     """
@@ -80,10 +78,10 @@ class GeminiClient:
         _load_dotenv()
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
         env_model = os.environ.get("GEMINI_MODEL")
-        if env_model:
-            self.model = env_model
-        elif model and model != "gemini-3.8-flash":
-            self.model = model
+        if env_model and env_model.strip():
+            self.model = env_model.strip()
+        elif model and model.strip():
+            self.model = model.strip()
         else:
             self.model = DEFAULT_GEMINI_MODEL
         self.timeout_seconds = timeout_seconds
@@ -163,35 +161,24 @@ class GeminiClient:
             },
         }
 
-        # Try primary model, with automatic fallback if 404 or 429
-        candidate_models = [self.model]
-        for fb in ("gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-1.5-flash"):
-            if fb not in candidate_models:
-                candidate_models.append(fb)
-
-        for attempt_model in candidate_models:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{attempt_model}:generateContent?key={self.api_key}"
-            try:
-                logger.info(f"Querying Gemini API (model: {attempt_model})...")
-                resp = requests.post(url, json=body, headers=headers, timeout=self.timeout_seconds)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    candidates = data.get("candidates", [])
-                    if candidates:
-                        parts = candidates[0].get("content", {}).get("parts", [])
-                        if parts:
-                            raw_text = parts[0].get("text", "")
-                            self.model = attempt_model
-                            logger.info(f"Gemini API successfully returned response for model {attempt_model}")
-                            return json.loads(raw_text)
-                elif resp.status_code in (404, 429):
-                    logger.warning(f"Gemini API model {attempt_model} returned status {resp.status_code}, trying next candidate...")
-                    continue
-                else:
-                    logger.warning(f"Gemini API returned status {resp.status_code}: {resp.text[:200]}")
-                    break
-            except Exception as e:
-                logger.warning(f"Gemini API invocation error on {attempt_model}: {e}")
+        # Query strictly with the single model configured in .env
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={self.api_key}"
+        try:
+            logger.info(f"Querying Gemini API (model: {self.model})...")
+            resp = requests.post(url, json=body, headers=headers, timeout=self.timeout_seconds)
+            if resp.status_code == 200:
+                data = resp.json()
+                candidates = data.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    if parts:
+                        raw_text = parts[0].get("text", "")
+                        logger.info(f"Gemini API successfully returned response for model {self.model}")
+                        return json.loads(raw_text)
+            else:
+                logger.warning(f"Gemini API (model {self.model}) returned status {resp.status_code}: {resp.text[:200]}")
+        except Exception as e:
+            logger.warning(f"Gemini API invocation error on {self.model}: {e}")
 
         return None
 

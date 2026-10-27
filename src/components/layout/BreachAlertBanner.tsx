@@ -105,11 +105,10 @@ export const BreachAlertBanner: React.FC = () => {
   return (
     <div
       role="alert"
-      className={`relative z-40 border-b shadow-lg transition-all duration-300 ${
-        isCritical
+      className={`relative z-40 border-b shadow-lg transition-all duration-300 ${isCritical
           ? 'border-red-500/40 bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white'
           : 'border-amber-500/40 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white'
-      }`}
+        }`}
     >
       {/* Primary Banner Strip */}
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3">
@@ -184,7 +183,6 @@ export const BreachAlertBanner: React.FC = () => {
                 {copilotData?.model_used && (
                   <span className="inline-flex items-center gap-1 rounded bg-[#EEF2FF] border border-[#CBD5E1] px-2 py-0.5 text-[10px] font-bold text-[#5267D8]">
                     <Cpu className="h-3 w-3" />
-                    <span>{copilotData.model_used}</span>
                   </span>
                 )}
               </div>
@@ -255,9 +253,8 @@ export const BreachAlertBanner: React.FC = () => {
                     {copilotData.assumptions?.slice(0, 3).map((a: any, idx: number) => (
                       <div key={idx} className="flex items-center justify-between gap-2 text-[#202938]">
                         <span className="truncate text-[#334155]">{a.statement}</span>
-                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold border ${
-                          a.status === 'VALIDATED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
-                        }`}>
+                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold border ${a.status === 'VALIDATED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
+                          }`}>
                           {a.status}
                         </span>
                       </div>
