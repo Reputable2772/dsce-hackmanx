@@ -5,9 +5,13 @@ import {
   Sliders, 
   ShieldCheck, 
   AlertTriangle, 
-  ShieldAlert 
+  ShieldAlert,
+  Bell,
+  BellOff,
+  BellRing
 } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
+import { useBreachNotifications } from '@/features/alerts/useBreachNotifications';
 import { LiveProbeModal } from './LiveProbeModal';
 import { ThresholdsModal } from './ThresholdsModal';
 
@@ -44,6 +48,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onOpenMobileMenu }) => {
   } = useAppStore();
   const [liveProbeOpen, setLiveProbeOpen] = useState(false);
   const [thresholdsOpen, setThresholdsOpen] = useState(false);
+  const { permissionGranted, permissionStatus, requestPermission } = useBreachNotifications();
   const isConnected = connectionState === 'connected';
   const activeMode = operatingMode || latestStatus?.mode || 'synthetic';
 
@@ -125,6 +130,38 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onOpenMobileMenu }) => {
           <span className={`h-1.5 w-1.5 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-amber-500'}`} />
           <span className="hidden md:inline">{isConnected ? '127.0.0.1:8000' : 'Offline Mode'}</span>
         </span>
+
+        {/* Browser Push Notifications Toggle */}
+        <button
+          type="button"
+          onClick={requestPermission}
+          className={`relative rounded-lg p-2 transition-colors cursor-pointer ${
+            permissionGranted
+              ? 'text-emerald-600 hover:bg-emerald-50'
+              : permissionStatus === 'denied'
+              ? 'text-slate-400 hover:bg-slate-100'
+              : 'text-amber-600 hover:bg-amber-50 animate-pulse'
+          }`}
+          title={
+            permissionGranted
+              ? 'Browser Notifications Active (Entry alerts for Warnings, Degraded, Abstain)'
+              : permissionStatus === 'denied'
+              ? 'Browser Notifications Blocked in Browser Preferences'
+              : 'Click to Enable Browser Notifications for Warnings, Degraded, and Abstain'
+          }
+          aria-label="Browser Notifications"
+        >
+          {permissionGranted ? (
+            <BellRing className="h-4 w-4" />
+          ) : permissionStatus === 'denied' ? (
+            <BellOff className="h-4 w-4" />
+          ) : (
+            <Bell className="h-4 w-4" />
+          )}
+          {permissionGranted && (
+            <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          )}
+        </button>
 
         {/* Detection & Gate Thresholds Tuning */}
         <button

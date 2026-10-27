@@ -1,5 +1,6 @@
 """Multi-factor Reliability Gate evaluating sensor quality, distribution drift, and residual errors."""
 
+import os
 from typing import List, Optional
 import numpy as np
 from scipy.stats import ks_2samp
@@ -129,14 +130,46 @@ class ReliabilityGate:
         for metric_id in ["packets_in_sec", "packets_out_sec", "throughput_mbps", "icmp_inbound_rate"]:
             _, m_vals, _ = buffer.get_series(metric_id, current_time - self.lookback_seconds, current_time)
             clean_m = m_vals[~np.isnan(m_vals)]
-            if len(clean_m) > 0 and np.any(clean_m >= 0.0):
+            if len(clean_m) > 0 and np.any(clean_m > 0.0):
                 node_operational = True
                 break
 
         # Check if physical link carrier is down (carrier = 0)
-        _, link_vals, _ = buffer.get_series("link_state", current_time - 15.0, current_time)
+        _, link_vals, _ = buffer.get_series("link_state", current_time - 30.0, current_time)
         clean_link = link_vals[~np.isnan(link_vals)]
-        link_hard_down = len(clean_link) > 0 and clean_link[-1] == 0.0
+        link_hard_down = len(clean_link) > 0 and clean_link[-1] <= 0.0
+
+        # Fast-path sysfs check for live mode interface
+        if is_live and not link_hard_down:
+            recent_live_pts = buffer.get_window(current_time - 10.0, current_time)
+            for pt in recent_live_pts:
+                if pt.interface_id and pt.interface_id not in ("all", "*", "auto"):
+                    flags_p = f"/sys/class/net/{pt.interface_id}/flags"
+                    oper_p = f"/sys/class/net/{pt.interface_id}/operstate"
+                    carrier_p = f"/sys/class/net/{pt.interface_id}/carrier"
+                    if os.path.exists(flags_p):
+                        try:
+                            f_val = int(open(flags_p, "r").read().strip(), 16)
+                            if not (f_val & 0x1):
+                                link_hard_down = True
+                                break
+                        except Exception:
+                            pass
+                    if not link_hard_down and os.path.exists(oper_p):
+                        try:
+                            if open(oper_p, "r").read().strip().lower() in ("down", "dormant", "lowerlayerdown", "notpresent"):
+                                link_hard_down = True
+                                break
+                        except Exception:
+                            pass
+                    if not link_hard_down and os.path.exists(carrier_p):
+                        try:
+                            if open(carrier_p, "r").read().strip() == "0":
+                                link_hard_down = True
+                                break
+                        except Exception:
+                            link_hard_down = True
+                            break
 
         # Check recent 10-second window for sustained normality
         t_recent_10 = current_time - 10.0

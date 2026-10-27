@@ -1,0 +1,41 @@
+[
+  {
+    "id": "peer-inbound-172-25-83-62",
+    "name": "Peer (172.25.83.62)",
+    "address": "172.25.83.62",
+    "description": "Discovered active LAN neighbor on enp0s31f6",
+    "probe_enabled": true,
+    "port": 80,
+    "role": "Inbound Network Peer",
+    "mac_address": "d4:93:90:63:db:84",
+    "is_inbound": true,
+    "packets_sent": 0,
+    "packets_received": 1
+  },
+  {
+    "id": "peer-inbound-172-25-80-1",
+    "name": "Peer (172.25.80.1)",
+    "address": "172.25.80.1",
+    "description": "Discovered active LAN neighbor on enp0s31f6",
+    "probe_enabled": true,
+    "port": 80,
+    "role": "Inbound Network Peer",
+    "mac_address": "0c:11:67:b8:87:d4",
+    "is_inbound": true,
+    "packets_sent": 0,
+    "packets_received": 1
+  },
+  {
+    "id": "peer-inbound-172-25-80-33",
+    "name": "Peer (172.25.80.33)",
+    "address": "172.25.80.33",
+    "description": "Discovered active LAN neighbor on enp0s31f6",
+    "probe_enabled": true,
+    "port": 80,
+    "role": "Inbound Network Peer",
+    "mac_address": "48:9e:bd:74:93:e3",
+    "is_inbound": true,
+    "packets_sent": 0,
+    "packets_received": 1
+  }
+]

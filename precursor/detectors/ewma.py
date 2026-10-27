@@ -62,7 +62,7 @@ class EWMADetector(BaseDetector):
         current_ewma = ewma_vals[-1]
         residuals = valid_vals - ewma_vals
         rolling_std = float(np.std(residuals)) if len(residuals) > 1 else 1.0
-        rolling_std = max(rolling_std, 1e-4)
+        rolling_std = max(rolling_std, 0.2)
 
         current_val = float(valid_vals[-1])
         z_score = float((current_val - current_ewma) / rolling_std)
@@ -84,7 +84,8 @@ class EWMADetector(BaseDetector):
             projected_z = (projected_ewma - current_ewma) / rolling_std
 
             if slope > 0 and (projected_ewma > upper_limit or projected_z >= self.k_sigma):
-                predicted_impact = True
+                if projected_ewma > 1.0:
+                    predicted_impact = True
 
         return DetectorResult(
             detector_name=self.name,

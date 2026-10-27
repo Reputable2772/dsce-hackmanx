@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { LeftSidebar } from '@/components/layout/LeftSidebar';
 import { TopHeader } from '@/components/layout/TopHeader';
+import { BreachAlertBanner } from '@/components/layout/BreachAlertBanner';
 import { useAppStore } from '@/stores/useAppStore';
 
 export const AppShell: React.FC = () => {
@@ -41,6 +42,9 @@ export const AppShell: React.FC = () => {
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top Header Bar */}
         <TopHeader onOpenMobileMenu={() => setMobileMenuOpen(true)} />
+
+        {/* Real-time Incident & Gate Breach Banner */}
+        <BreachAlertBanner />
 
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto">

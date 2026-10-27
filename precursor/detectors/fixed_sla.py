@@ -69,7 +69,7 @@ class FixedSLADetector(BaseDetector):
             future_delta = time_deltas[-1] + horizon_seconds
             projected_val = float(slope * future_delta + intercept)
 
-            if slope > 0 and projected_val >= self.threshold:
+            if slope > 0.005 and projected_val >= self.threshold and current_val >= (self.threshold * 0.1):
                 predicted_impact = True
 
         raw_score = current_val

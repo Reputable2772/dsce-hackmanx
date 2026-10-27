@@ -165,6 +165,54 @@ class LiveTelemetryCollector:
                     stats["tx_packets"] = float(data[9])
             except Exception:
                 pass
+
+        # Determine physical carrier / administrative state for the monitored interface
+        target_iface = self.interface_id if self.interface_id not in ("all", "*", "auto") else None
+        if not target_iface:
+            detected_iface, _ = get_default_network_info()
+            target_iface = detected_iface
+
+        link_up = 1.0
+        if target_iface:
+            oper_path = f"/sys/class/net/{target_iface}/operstate"
+            flags_path = f"/sys/class/net/{target_iface}/flags"
+            carrier_path = f"/sys/class/net/{target_iface}/carrier"
+
+            is_up = True
+            # 1. Check IFF_UP flag bit (0x1)
+            if os.path.exists(flags_path):
+                try:
+                    with open(flags_path, "r", encoding="utf-8") as f:
+                        flags_val = int(f.read().strip(), 16)
+                    if not (flags_val & 0x1):
+                        is_up = False
+                except Exception:
+                    pass
+
+            # 2. Check operstate
+            if is_up and os.path.exists(oper_path):
+                try:
+                    with open(oper_path, "r", encoding="utf-8") as f:
+                        oper_val = f.read().strip().lower()
+                    if oper_val in ("down", "dormant", "lowerlayerdown", "notpresent"):
+                        is_up = False
+                except Exception:
+                    pass
+
+            # 3. Check carrier
+            if is_up and os.path.exists(carrier_path):
+                try:
+                    with open(carrier_path, "r", encoding="utf-8") as f:
+                        carrier_val = f.read().strip()
+                    if carrier_val == "0":
+                        is_up = False
+                except Exception:
+                    # Kernel returns EINVAL or ENOENT if interface is down
+                    is_up = False
+
+            link_up = 1.0 if is_up else 0.0
+
+        stats["link_up"] = link_up
         return stats
 
     def read_icmp_stats(self) -> Dict[str, float]:
@@ -218,6 +266,7 @@ class LiveTelemetryCollector:
         packets_in_sec = 0.0
         packets_out_sec = 0.0
         inbound_icmp_rate = 0.0
+        drops_in_sec = 0.0
         if self._prev_stats is not None and self._prev_time is not None:
             dt = max(0.1, now - self._prev_time)
             delta_bytes = (stats["rx_bytes"] - self._prev_stats["rx_bytes"]) + (
@@ -232,6 +281,10 @@ class LiveTelemetryCollector:
                 packets_in_sec = round(delta_rx_pkts / dt, 1)
             if delta_tx_pkts >= 0:
                 packets_out_sec = round(delta_tx_pkts / dt, 1)
+
+            delta_rx_drops = stats["rx_drops"] - self._prev_stats.get("rx_drops", stats["rx_drops"])
+            if delta_rx_drops >= 0:
+                drops_in_sec = round(delta_rx_drops / dt, 1)
 
             if self._prev_icmp_stats is not None:
                 delta_echos = icmp_stats["in_echos"] - self._prev_icmp_stats["in_echos"]
@@ -306,7 +359,7 @@ class LiveTelemetryCollector:
             TelemetryPoint(
                 timestamp=now,
                 metric_id="drops_in",
-                value=stats["rx_drops"],
+                value=drops_in_sec,
                 quality=MetricQuality.GOOD,
                 source="live",
                 interface_id=self.interface_id,

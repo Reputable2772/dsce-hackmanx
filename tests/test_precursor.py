@@ -129,6 +129,14 @@ def test_reliability_gate_three_states():
     assert dec_recovered.state == GateState.PREDICT
     assert "Normality sustained for >10s" in dec_recovered.reasons[0]
 
+    # 5. ABSTAIN: Hardware link severance (carrier = 0) drops gate to ABSTAIN
+    buf_rec.add_batch([
+        TelemetryPoint(timestamp=t_start + 15.0, metric_id="link_state", value=0.0, quality=MetricQuality.GOOD),
+    ])
+    dec_link_down = gate.evaluate(buf_rec, t_start + 15.0)
+    assert dec_link_down.state == GateState.ABSTAIN
+    assert "Physical link state hard down" in dec_link_down.reasons[0]
+
 
 # -------------------------------------------------------------
 # 4. Incident Grouping Tests
