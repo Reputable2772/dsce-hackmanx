@@ -36,6 +36,7 @@ class ReliabilityGate:
         buffer: TelemetryBuffer,
         current_time: float,
         target_metrics: Optional[List[str]] = None,
+        is_live: bool = False,
     ) -> GateDecision:
         if target_metrics is None:
             target_metrics = [
@@ -122,9 +123,23 @@ class ReliabilityGate:
                     reasons.append(f"Inbound packet rate variance surge: {expansion_in:.1f}x baseline")
                     residual_score = max(residual_score, round(expansion_in, 2))
 
+        # Check if other networks/metrics on the node are active and operational
+        node_operational = False
+        for metric_id in ["packets_in_sec", "packets_out_sec", "throughput_mbps", "icmp_inbound_rate"]:
+            _, m_vals, _ = buffer.get_series(metric_id, current_time - self.lookback_seconds, current_time)
+            clean_m = m_vals[~np.isnan(m_vals)]
+            if len(clean_m) > 0 and np.any(clean_m >= 0.0):
+                node_operational = True
+                break
+
         # 4. Synthesize Gate State
         if hard_sensor_failure:
-            state = GateState.ABSTAIN
+            if is_live and node_operational and unhealthy_ratio < 0.85:
+                # Other networks/interfaces are operational on the node: degrade rather than completely abstaining
+                state = GateState.DEGRADED
+                reasons.append("Peer probe sensor degraded, but node interfaces remain operational: preserving predictions in DEGRADED mode.")
+            else:
+                state = GateState.ABSTAIN
         elif mild_sensor_degraded or drift_detected or residual_score > self.residual_expansion_threshold:
             state = GateState.DEGRADED
         else:

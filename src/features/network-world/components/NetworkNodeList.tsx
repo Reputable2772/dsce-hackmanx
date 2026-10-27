@@ -15,6 +15,8 @@ import { apiClient } from '@/lib/api';
 interface NetworkNodeListProps {
   nodes: TopologyNodeData[];
   selectedNodeId: string | null;
+  hoveredNodeId?: string | null;
+  onHoverNodeId?: (nodeId: string | null) => void;
   onSelectNode: (node: TopologyNodeData | null) => void;
   onRefresh?: () => void;
   isLiveMode?: boolean;
@@ -23,6 +25,8 @@ interface NetworkNodeListProps {
 export const NetworkNodeList: React.FC<NetworkNodeListProps> = ({
   nodes,
   selectedNodeId,
+  hoveredNodeId,
+  onHoverNodeId,
   onSelectNode,
   onRefresh,
 }) => {
@@ -61,17 +65,16 @@ export const NetworkNodeList: React.FC<NetworkNodeListProps> = ({
 
   const getNodeRoleBadge = (node: TopologyNodeData) => {
     const role = node.metadata?.role || node.type;
-    const isWindowsWorkstation =
-      node.id.includes('172-25-80-33') ||
-      node.metadata?.ipAddress === '172.25.80.33' ||
-      node.name.toLowerCase().includes('windows') ||
-      node.name.toLowerCase().includes('inbound peer');
+    const isInboundPeer =
+      node.id.includes('inbound') ||
+      node.name.toLowerCase().includes('inbound') ||
+      role.toLowerCase().includes('inbound');
 
-    if (isWindowsWorkstation) {
+    if (isInboundPeer) {
       return (
-        <span className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 font-mono text-[10px] font-bold text-amber-800">
-          <Radio className="h-2.5 w-2.5 text-amber-600 animate-pulse" />
-          <span>Inbound Ping / Spam Source</span>
+        <span className="inline-flex items-center gap-1 rounded-md border border-cyan-300 bg-cyan-50 px-2 py-0.5 font-mono text-[10px] font-bold text-cyan-800">
+          <Radio className="h-2.5 w-2.5 text-cyan-600 animate-pulse" />
+          <span>Inbound Peer / Ping Source</span>
         </span>
       );
     }
@@ -205,11 +208,11 @@ export const NetworkNodeList: React.FC<NetworkNodeListProps> = ({
             ) : (
               filteredNodes.map((node) => {
                 const isSelected = selectedNodeId === node.id;
-                const isWindowsWorkstation =
-                  node.id.includes('172-25-80-33') ||
-                  node.metadata?.ipAddress === '172.25.80.33' ||
-                  node.name.toLowerCase().includes('windows') ||
-                  node.name.toLowerCase().includes('inbound peer');
+                const isHovered = hoveredNodeId === node.id;
+                const isInboundPeer =
+                  node.id.includes('inbound') ||
+                  node.name.toLowerCase().includes('inbound') ||
+                  node.metadata?.role?.toLowerCase().includes('inbound');
 
                 const rtt = node.metrics?.latencyMs;
                 const jitter = node.metrics?.jitterMs;
@@ -221,11 +224,15 @@ export const NetworkNodeList: React.FC<NetworkNodeListProps> = ({
                   <tr
                     key={node.id}
                     onClick={() => onSelectNode(node)}
+                    onMouseEnter={() => onHoverNodeId && onHoverNodeId(node.id)}
+                    onMouseLeave={() => onHoverNodeId && onHoverNodeId(null)}
                     className={`cursor-pointer transition-colors ${
                       isSelected
-                        ? 'bg-indigo-50/70 border-l-4 border-l-[#5267D8]'
-                        : isWindowsWorkstation
-                        ? 'bg-amber-50/30 hover:bg-amber-50/60'
+                        ? 'bg-indigo-50/90 border-l-4 border-l-[#5267D8]'
+                        : isHovered
+                        ? 'bg-indigo-50/40 border-l-4 border-l-indigo-400'
+                        : isInboundPeer
+                        ? 'bg-cyan-50/20 hover:bg-cyan-50/40'
                         : 'hover:bg-[#F8FAFC]'
                     }`}
                   >
@@ -234,9 +241,9 @@ export const NetworkNodeList: React.FC<NetworkNodeListProps> = ({
                       <div className="flex flex-col">
                         <span className="font-bold text-[#202938] flex items-center gap-1.5">
                           {node.name}
-                          {isWindowsWorkstation && (
-                            <span className="rounded bg-amber-200 px-1.5 py-0.2 text-[9px] font-bold text-amber-900 uppercase">
-                              Active Tester
+                          {isInboundPeer && (
+                            <span className="rounded bg-cyan-100 px-1.5 py-0.2 text-[9px] font-bold text-cyan-800 uppercase">
+                              Inbound Peer
                             </span>
                           )}
                         </span>

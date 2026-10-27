@@ -25,19 +25,10 @@ export const IncidentsPage: React.FC = () => {
   const [selectedSeverity, setSelectedSeverity] = useState<IncidentSeverity | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<IncidentStatus | 'ALL'>('ALL');
   const [selectedCategory, setSelectedCategory] = useState<IncidentCategory | 'ALL'>('ALL');
-  const [selectedSource, setSelectedSource] = useState<'ALL' | 'SYNTHETIC' | 'LIVE'>(
-    operatingMode === 'live' ? 'LIVE' : 'ALL'
-  );
+  const [selectedSource, setSelectedSource] = useState<'ALL' | 'SYNTHETIC' | 'LIVE'>('ALL');
   const [selectedNode, setSelectedNode] = useState<string>('ALL');
   const [sortBy, setSortBy] = useState<'RECENT' | 'SEVERITY'>('RECENT');
   const [isLoading, setIsLoading] = useState<boolean>(true);
-
-  // Sync source filter if mode changes to live
-  useEffect(() => {
-    if (operatingMode === 'live') {
-      setSelectedSource('LIVE');
-    }
-  }, [operatingMode]);
 
   useEffect(() => {
     let isMounted = true;
@@ -106,16 +97,11 @@ export const IncidentsPage: React.FC = () => {
           return false;
         }
 
-        // In Live Mode, strictly exclude synthetic incidents
-        if (operatingMode === 'live') {
-          const incSource = (inc.source || 'synthetic').toLowerCase();
-          if (incSource !== 'live') {
-            return false;
-          }
-        } else if (selectedSource !== 'ALL') {
+        // Source filter
+        if (selectedSource !== 'ALL') {
           const matchSource = selectedSource.toLowerCase();
-          const incSource = (inc.source || 'synthetic').toLowerCase();
-          if (incSource !== matchSource) {
+          const incSource = (inc.source || 'live').toLowerCase();
+          if (incSource !== matchSource && incSource !== 'all') {
             return false;
           }
         }

@@ -184,12 +184,18 @@ export function normalizeIncident(raw: any, index: number = 0): IncidentRecord {
     : [];
 
   // 10. Hypotheses
-  const hypotheses = Array.isArray(raw.hypotheses)
+  const rawHypList = (Array.isArray(raw.hypotheses) && raw.hypotheses.length > 0)
     ? raw.hypotheses
-    : Array.isArray(raw.copilot_hypotheses) && raw.copilot_hypotheses.length > 0
-    ? raw.copilot_hypotheses.map((h: any, idx: number) => ({
+    : (Array.isArray(raw.copilot_hypotheses) && raw.copilot_hypotheses.length > 0)
+    ? raw.copilot_hypotheses
+    : (Array.isArray(raw.copilot?.hypotheses) && raw.copilot.hypotheses.length > 0)
+    ? raw.copilot.hypotheses
+    : null;
+
+  const hypotheses = rawHypList
+    ? rawHypList.map((h: any, idx: number) => ({
         id: `hyp-${id}-${idx + 1}`,
-        title: h.statement || String(h),
+        title: h.statement || (typeof h === 'string' ? h : h.title || String(h)),
         likelihood: h.confidence && h.confidence > 0.7 ? ('High' as const) : ('Medium' as const),
         rationale: h.rationale || `Grounded in observed telemetry evidence.`,
         isHypothesis: true as const,
@@ -206,12 +212,18 @@ export function normalizeIncident(raw: any, index: number = 0): IncidentRecord {
 
   // 11. Diagnostic steps & Runbook commands
   let diagnosticSteps: any[] = [];
+  const rawCmds = (Array.isArray(raw.diagnostic_commands) && raw.diagnostic_commands.length > 0)
+    ? raw.diagnostic_commands
+    : (Array.isArray(raw.copilot?.diagnostic_commands) && raw.copilot.diagnostic_commands.length > 0)
+    ? raw.copilot.diagnostic_commands
+    : null;
+
   if (Array.isArray(raw.diagnosticSteps) && raw.diagnosticSteps.length > 0) {
     diagnosticSteps = raw.diagnosticSteps;
-  } else if (Array.isArray(raw.diagnostic_commands) && raw.diagnostic_commands.length > 0) {
-    diagnosticSteps = raw.diagnostic_commands.map((cmd: string, idx: number) => ({
+  } else if (rawCmds) {
+    diagnosticSteps = rawCmds.map((cmd: string, idx: number) => ({
       step: idx + 1,
-      action: `Diagnostic runbook probe step`,
+      action: `AI Copilot Diagnostic Step`,
       command: cmd,
       expected: 'Confirm execution returns 0 without socket error or timeout',
     }));
@@ -226,7 +238,7 @@ export function normalizeIncident(raw: any, index: number = 0): IncidentRecord {
       {
         step: 2,
         action: 'Measure ICMP round-trip latency and packet loss',
-        command: 'ping -c 5 172.25.80.31',
+        command: 'ping -c 5 1.1.1.1',
         expected: 'RTT < 50ms and 0% packet loss',
       },
       {

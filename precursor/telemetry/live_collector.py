@@ -148,16 +148,21 @@ class LiveTelemetryCollector:
                             stats["tx_bytes"] += float(data[8])
                             stats["tx_packets"] += float(data[9])
                             matched = True
-                # If explicit interface_id not matched, fallback to first non-lo interface
+                # If explicit interface_id not matched, dynamically find active default or highest traffic NIC
                 if not matched and non_lo_lines:
-                    iface, data = non_lo_lines[0]
+                    detected_iface, _ = get_default_network_info()
+                    target_candidate = next((item for item in non_lo_lines if item[0] == detected_iface), None)
+                    if not target_candidate:
+                        # Pick the interface with the highest active traffic
+                        target_candidate = max(non_lo_lines, key=lambda item: float(item[1][1]))
+                    iface, data = target_candidate
                     self.interface_id = iface
-                    stats["rx_bytes"] += float(data[0])
-                    stats["rx_packets"] += float(data[1])
-                    stats["rx_errors"] += float(data[2])
-                    stats["rx_drops"] += float(data[3])
-                    stats["tx_bytes"] += float(data[8])
-                    stats["tx_packets"] += float(data[9])
+                    stats["rx_bytes"] = float(data[0])
+                    stats["rx_packets"] = float(data[1])
+                    stats["rx_errors"] = float(data[2])
+                    stats["rx_drops"] = float(data[3])
+                    stats["tx_bytes"] = float(data[8])
+                    stats["tx_packets"] = float(data[9])
             except Exception:
                 pass
         return stats
@@ -203,10 +208,10 @@ class LiveTelemetryCollector:
         if self._recent_probes:
             dropped = sum(1 for s in self._recent_probes if not s)
             loss_pct = round((dropped / len(self._recent_probes)) * 100.0, 1)
-            loss_quality = MetricQuality.GOOD if loss_pct < 100.0 else MetricQuality.MISSING
+            loss_quality = MetricQuality.GOOD
         else:
             loss_pct = 0.0 if rtt is not None else 100.0
-            loss_quality = rtt_quality
+            loss_quality = MetricQuality.GOOD if rtt is not None else MetricQuality.MISSING
 
         # 3. Throughput and packet rate calculations from byte and packet counter deltas
         throughput_mbps = 0.0

@@ -195,7 +195,7 @@ class OllamaCopilot:
         Returns CopilotResponse if successful, or None on error/timeout.
         """
         model = self._get_available_model()
-        if not model:
+        if not model and not self.gemini_client.is_configured:
             return None
 
         matched_rb_text = "\n\n".join([m.content for m in runbook_matches]) if runbook_matches else "No matching runbook."
@@ -236,8 +236,9 @@ MANDATORY INSTRUCTIONS:
   "risks_and_rollback": ["Restarting interface interrupts in-flight connections"]
 }}
 """
-        # 1. Asynchronously dispatch prompt to local Ollama (fire-and-forget; do not wait for reply)
-        fire_ollama_prompt_async(self.base_url, model, prompt)
+        # 1. Asynchronously dispatch prompt to local Ollama if available
+        if model:
+            fire_ollama_prompt_async(self.base_url, model, prompt)
 
         # 2. Query Gemini API for synthesis
         parsed_strict = None
@@ -281,8 +282,8 @@ MANDATORY INSTRUCTIONS:
             for vh in verified_hypotheses
         ]
 
-        # 5. Show response seamlessly as local model per directive
-        local_display_model = f"{model} (local)"
+        # 5. Model display identifier
+        display_model = f"gemini ({self.gemini_client.model})" if gemini_dict else (f"{model} (local)" if model else "instant_heuristic_runbook")
 
         return CopilotResponse(
             summary=parsed_strict.summary,
@@ -295,7 +296,7 @@ MANDATORY INSTRUCTIONS:
             risks_and_rollback=parsed_strict.risks_and_rollback,
             claims=claims,
             raw_llm_output=raw_text,
-            model_used=local_display_model,
+            model_used=display_model,
         )
 
     def explain_and_recommend(
@@ -306,8 +307,12 @@ MANDATORY INSTRUCTIONS:
     ) -> CopilotResponse:
         """
         Generate grounded troubleshooting guidance enforcing strict JSON schema and dual auditing.
-        Synchronous path returns sub-5ms instant heuristic overview.
+        If Gemini is configured, invokes Gemini for deep synthesis; otherwise returns sub-5ms instant heuristic.
         """
+        if self.gemini_client.is_configured:
+            deep_res = self.query_ollama(incident, telemetry_snapshot, runbook_matches, timeout_seconds=12.0)
+            if deep_res:
+                return deep_res
         return self.generate_instant_overview(incident, telemetry_snapshot, runbook_matches)
 
     def query(
@@ -369,6 +374,7 @@ Format your response under these 5 headings:
             raw_risks = gemini_dict.get("risks_and_rollback", [])
             risks = "\n".join(f"- {r}" for r in raw_risks)
             raw_text = f"### Summary\n{summary}\n\n### Hypotheses\n{hyps}\n\n### Diagnostic Commands\n```bash\n{cmds}\n```\n\n### Verification Steps\n{steps}\n\n### Risks and Rollback\n{risks}\n"
+            used_model = f"gemini ({self.gemini_client.model})"
 
         if not raw_text:
             rb = runbook_matches[0] if runbook_matches else None

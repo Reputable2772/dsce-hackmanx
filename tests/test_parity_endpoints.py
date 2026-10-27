@@ -1,12 +1,34 @@
 """Integration and parity tests for newly wired backend endpoints."""
 
 import json
+import time
+import threading
 import urllib.request
 import urllib.error
 import pytest
 
+from precursor.server import create_server
+from precursor.runner import PrecursorEngine
+from precursor.telemetry.synthetic import ScenarioType
 
 SERVER_BASE = "http://127.0.0.1:8000"
+
+
+@pytest.fixture(scope="module", autouse=True)
+def ensure_server():
+    try:
+        urllib.request.urlopen("http://127.0.0.1:8000/api/health", timeout=0.5)
+        yield
+    except Exception:
+        engine = PrecursorEngine(scenario_type=ScenarioType.GRADUAL_DEGRADATION, seed=42)
+        engine.fast_forward(125.0)
+        server = create_server(host="127.0.0.1", port=8000, engine=engine)
+        t = threading.Thread(target=server.serve_forever, daemon=True)
+        t.start()
+        time.sleep(0.3)
+        yield
+        server.shutdown()
+        server.server_close()
 
 
 def _request(method: str, path: str, data: dict = None):

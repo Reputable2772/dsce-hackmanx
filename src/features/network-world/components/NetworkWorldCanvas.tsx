@@ -64,6 +64,8 @@ interface NetworkWorldCanvasProps {
   topology: NetworkTopologyData;
   selectedNodeId: string | null;
   selectedLinkId: string | null;
+  hoveredNodeId?: string | null;
+  onHoverNodeId?: (nodeId: string | null) => void;
   onSelectNode: (node: TopologyNodeData | null) => void;
   onSelectLink: (link: TopologyLinkData | null) => void;
   inspectorOpen: boolean;
@@ -77,6 +79,8 @@ export const NetworkWorldCanvas: React.FC<NetworkWorldCanvasProps> = ({
   topology,
   selectedNodeId,
   selectedLinkId,
+  hoveredNodeId,
+  onHoverNodeId,
   onSelectNode,
   onSelectLink,
   inspectorOpen,
@@ -91,6 +95,31 @@ export const NetworkWorldCanvas: React.FC<NetworkWorldCanvasProps> = ({
   const [showLabels, setShowLabels] = useState(true);
   const { showParticles, setShowParticles } = useSettingsStore();
   const webglSupported = useMemo(() => isWebGLSupported(), []);
+
+  // Synchronize 3D camera focus whenever a node is selected (e.g. from the clients table or canvas)
+  React.useEffect(() => {
+    if (selectedNodeId && controlsRef.current) {
+      const selected = topology.nodes.find((n) => n.id === selectedNodeId);
+      if (selected && selected.position) {
+        controlsRef.current.target.set(selected.position[0], selected.position[1], selected.position[2]);
+        controlsRef.current.update();
+      }
+    }
+  }, [selectedNodeId, topology.nodes]);
+
+  const effectiveHoveredNode = useMemo(() => {
+    if (hoveredNodeId) {
+      return topology.nodes.find((n) => n.id === hoveredNodeId) || null;
+    }
+    return hoveredNode;
+  }, [hoveredNodeId, hoveredNode, topology.nodes]);
+
+  const handleHoverNode = (node: TopologyNodeData | null) => {
+    setHoveredNode(node);
+    if (onHoverNodeId) {
+      onHoverNodeId(node?.id ?? null);
+    }
+  };
 
   // Camera action: Reset view
   const handleResetCamera = () => {
@@ -248,11 +277,11 @@ export const NetworkWorldCanvas: React.FC<NetworkWorldCanvasProps> = ({
               topology={topology}
               selectedNodeId={selectedNodeId}
               selectedLinkId={selectedLinkId}
-              hoveredNode={hoveredNode}
+              hoveredNode={effectiveHoveredNode}
               showLabels={showLabels}
               onSelectNode={onSelectNode}
               onSelectLink={onSelectLink}
-              onHoverNode={setHoveredNode}
+              onHoverNode={handleHoverNode}
               onHoverLink={setHoveredLink}
               onClearSelection={handleClearSelection}
               controlsRef={controlsRef}

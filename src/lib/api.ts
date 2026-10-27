@@ -48,6 +48,7 @@ export interface BackendPredictionsResponse {
       active_detectors: number;
     }
   >;
+  detailed_predictions?: any[];
 }
 
 export interface RegisteredSystem {

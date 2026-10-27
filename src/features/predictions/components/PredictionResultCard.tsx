@@ -66,18 +66,24 @@ export const PredictionResultCard: React.FC<PredictionResultCardProps> = ({
               <span className={`font-mono text-base font-bold ${
                 prediction.detectorScore >= prediction.threshold
                   ? 'text-amber-600'
-                  : 'text-emerald-600'
+                  : prediction.detectorScore > 0
+                  ? 'text-emerald-600'
+                  : 'text-[#94A3B8]'
               }`}>
                 {prediction.detectorScore.toFixed(2)}
               </span>
               <span className="text-[10px] font-mono text-[#94A3B8]">
-                (Limit: {prediction.threshold.toFixed(2)})
+                {prediction.detectorScore === 0 ? '(Nominal Baseline)' : `(Limit: ${prediction.threshold.toFixed(2)})`}
               </span>
             </div>
           )}
 
           <div className="text-[9px] font-mono text-[#687386] mt-0.5">
-            {isAbstain ? '* SUPPRESSED BY RELIABILITY GATE' : prediction.scoreBadgeLabel}
+            {isAbstain
+              ? '* SUPPRESSED BY RELIABILITY GATE'
+              : prediction.detectorScore === 0
+              ? 'ZERO ANOMALY / NOMINAL BASELINE'
+              : prediction.scoreBadgeLabel}
           </div>
         </div>
       </div>
@@ -100,6 +106,22 @@ export const PredictionResultCard: React.FC<PredictionResultCardProps> = ({
               {prediction.potentialImpact}
             </p>
 
+            {/* Host & Interface Context */}
+            {(prediction.targetHost || prediction.interfaceId) && (
+              <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-[#475569] bg-slate-50 border border-slate-200 rounded px-2.5 py-1">
+                {prediction.targetHost && <span><strong>Host:</strong> {prediction.targetHost}</span>}
+                {prediction.interfaceId && <span>• <strong>Interface:</strong> {prediction.interfaceId}</span>}
+              </div>
+            )}
+
+            {/* Mathematical Formula / Calculation Breakdown */}
+            {prediction.mathFormula && (
+              <div className="rounded border border-indigo-100 bg-[#EEF2FF]/60 p-2 font-mono text-[11px] text-indigo-900">
+                <span className="font-bold text-[#5267D8]">Equation: </span>
+                {prediction.mathFormula}
+              </div>
+            )}
+
             {/* Degraded advisory tag if active */}
             {isDegraded && (
               <div className="flex items-center gap-1.5 rounded border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] text-amber-800">
@@ -117,14 +139,49 @@ export const PredictionResultCard: React.FC<PredictionResultCardProps> = ({
       <div className="border-t border-[#E3E8F0] pt-2">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="flex w-full items-center justify-between text-xs font-mono text-[#5267D8] hover:underline transition"
+          className="flex w-full items-center justify-between text-xs font-mono text-[#5267D8] hover:underline transition cursor-pointer"
         >
-          <span>{expanded ? 'Hide Detector Evidence & Math' : 'Inspect Detector Evidence & Limitations'}</span>
+          <span>{expanded ? 'Hide Detector Evidence & Packets Used' : 'Inspect Detector Evidence & Packets Used'}</span>
           {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
         </button>
 
         {expanded && (
           <div className="mt-3 space-y-3 rounded-lg border border-[#E3E8F0] bg-[#F8FAFC] p-3 text-xs">
+            {/* Real Packets Sample Table */}
+            {prediction.samplePackets && prediction.samplePackets.length > 0 && (
+              <div>
+                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#202938]">
+                  Packets Evaluated ({prediction.samplePackets.length} samples):
+                </span>
+                <div className="mt-1 overflow-x-auto rounded border border-[#E3E8F0] bg-white">
+                  <table className="w-full text-left font-mono text-[10px]">
+                    <thead className="border-b border-[#E3E8F0] bg-[#F8FAFC] text-[#687386]">
+                      <tr>
+                        <th className="px-2 py-1">Time</th>
+                        <th className="px-2 py-1">Proto</th>
+                        <th className="px-2 py-1">Source</th>
+                        <th className="px-2 py-1">Destination</th>
+                        <th className="px-2 py-1">Size</th>
+                        <th className="px-2 py-1">Reading</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E3E8F0]">
+                      {prediction.samplePackets.map((pkt, i) => (
+                        <tr key={i} className="hover:bg-slate-50">
+                          <td className="px-2 py-1 text-slate-500">{pkt.timestamp_iso || `${pkt.timestamp}`}</td>
+                          <td className="px-2 py-1 font-bold text-[#5267D8]">{pkt.protocol}</td>
+                          <td className="px-2 py-1 text-slate-700">{pkt.source}</td>
+                          <td className="px-2 py-1 text-slate-700">{pkt.destination}</td>
+                          <td className="px-2 py-1 text-slate-500">{pkt.packet_size ? `${pkt.packet_size}B` : '—'}</td>
+                          <td className="px-2 py-1 font-semibold text-amber-700">{pkt.value != null ? `${pkt.value}` : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {/* Evidence items */}
             <div>
               <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#687386]">
@@ -139,7 +196,7 @@ export const PredictionResultCard: React.FC<PredictionResultCardProps> = ({
                 )}
                 {prediction.evidence.currentValue && (
                   <div className="flex justify-between border-b border-[#E3E8F0] pb-1 text-[#687386]">
-                    <span>Observed Trajectory:</span>
+                    <span>Observed Value:</span>
                     <span className="text-amber-600 font-semibold">{prediction.evidence.currentValue}</span>
                   </div>
                 )}
@@ -166,18 +223,6 @@ export const PredictionResultCard: React.FC<PredictionResultCardProps> = ({
               <p className="mt-0.5 text-[11px] text-[#475569] leading-normal">
                 {prediction.evidence.methodology}
               </p>
-            </div>
-
-            {/* Explicit Limitations */}
-            <div>
-              <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-amber-700">
-                Known Model & Data Limitations:
-              </span>
-              <ul className="mt-1 list-disc pl-4 space-y-0.5 text-[11px] text-[#475569]">
-                {prediction.limitations.map((lim, i) => (
-                  <li key={i}>{lim}</li>
-                ))}
-              </ul>
             </div>
           </div>
         )}

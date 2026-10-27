@@ -28,6 +28,20 @@ export interface PredictionEvidence {
   methodology: string;
 }
 
+export interface PacketSampleItem {
+  packet_id: string;
+  timestamp: number;
+  timestamp_iso: string;
+  metric: string;
+  value: number | null;
+  quality: string;
+  protocol: string;
+  source: string;
+  destination: string;
+  destination_port?: number;
+  packet_size?: number;
+}
+
 export interface PredictionRecord {
   id: string;
   targetMetric: string;
@@ -45,6 +59,10 @@ export interface PredictionRecord {
   reliabilityState: GateState;
   evidence: PredictionEvidence;
   limitations: string[];
+  targetHost?: string;
+  interfaceId?: string;
+  mathFormula?: string;
+  samplePackets?: PacketSampleItem[];
 }
 
 export interface GateDecisionRecord {

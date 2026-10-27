@@ -233,6 +233,8 @@ class SystemProbeManager:
                         mac_address=item.get("mac_address"),
                         is_inbound=item.get("is_inbound", False),
                     )
+                    node.packets_sent = item.get("packets_sent", 1)
+                    node.packets_received = item.get("packets_received", 1)
                     self.systems[node.id] = node
             except Exception:
                 pass
@@ -265,19 +267,7 @@ class SystemProbeManager:
                 pass
 
         with self.lock:
-            # 1. Purge any nodes that have never sent or received packets with PRECURSOR
-            to_remove = []
-            for sys_id, s in self.systems.items():
-                if sys_id == "local-host":
-                    continue
-                sent = getattr(s, "packets_sent", 0)
-                recv = getattr(s, "packets_received", 0)
-                if sent == 0 and recv == 0:
-                    to_remove.append(sys_id)
-            for sys_id in to_remove:
-                del self.systems[sys_id]
-
-            # 2. Update hardware MAC on any existing traffic peers
+            # Register or update hardware MAC and device on active network peers
             for d in discovered:
                 ip = d["ip"]
                 node_id = f"peer-inbound-{ip.replace('.', '-')}"
@@ -285,6 +275,25 @@ class SystemProbeManager:
                 if existing:
                     if d.get("mac") and not getattr(existing, "mac_address", None):
                         existing.mac_address = d["mac"]
+                    if d.get("device"):
+                        existing.interface_name = d["device"]
+                else:
+                    peer_node = SystemNode(
+                        id=node_id,
+                        name=f"Peer ({ip})",
+                        address=ip,
+                        is_local=False,
+                        description=f"Discovered active LAN neighbor on {d.get('device', 'nic')}",
+                        probe_enabled=True,
+                        port=80,
+                        role="Inbound Network Peer",
+                        mac_address=d.get("mac"),
+                        is_inbound=True,
+                    )
+                    peer_node.interface_name = d.get("device")
+                    peer_node.packets_received = 1
+                    peer_node.packets_sent = 0
+                    self.systems[node_id] = peer_node
 
         return discovered
 
@@ -360,6 +369,8 @@ class SystemProbeManager:
                     "role": getattr(s, "role", "Inbound Network Peer" if getattr(s, "is_inbound", False) else "Configured Network Peer"),
                     "mac_address": getattr(s, "mac_address", None),
                     "is_inbound": getattr(s, "is_inbound", False),
+                    "packets_sent": getattr(s, "packets_sent", 0),
+                    "packets_received": getattr(s, "packets_received", 0),
                 })
             with open(self.data_file, "w", encoding="utf-8") as f:
                 json.dump(export_data, f, indent=2)
@@ -486,7 +497,7 @@ class SystemProbeManager:
         # Special alias: inbound-peer or ping/spam source
         if system_id == "inbound-peer" or "inbound" in system_id.lower() or "spam" in system_id.lower():
             for s in self.systems.values():
-                if getattr(s, "is_inbound", False) or s.address == "172.25.80.33":
+                if getattr(s, "is_inbound", False):
                     return s
 
         # Special alias: local-host
@@ -699,10 +710,7 @@ class SystemProbeManager:
         topo_links = []
 
         local_sys = next((s for s in nodes_list if s.is_local), None)
-        peers = [
-            s for s in nodes_list
-            if not s.is_local and (getattr(s, "packets_sent", 0) > 0 or getattr(s, "packets_received", 0) > 0 or getattr(s, "probe_enabled", False))
-        ]
+        peers = [s for s in nodes_list if not s.is_local]
 
         # 1. Place Local Host in center of 3D canvas
         if local_sys:

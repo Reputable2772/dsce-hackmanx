@@ -42,6 +42,7 @@ from precursor.storage import (
 from precursor.storage.incident_db import IncidentDB
 from precursor.storage.system_registry import SystemRegistry
 from precursor.storage.database import DatabaseManager
+from precursor.systems.manager import SystemProbeManager
 
 
 class SystemSnapshot(BaseModel):
@@ -93,6 +94,7 @@ class PrecursorEngine:
         self.storage_manager = RunStorageManager()
         self.incident_db = IncidentDB()
         self.system_registry = SystemRegistry()
+        self.system_manager = SystemProbeManager()
         self.db = DatabaseManager()
 
         # Asynchronous background LLM executor (Solution 1)
@@ -338,11 +340,12 @@ class PrecursorEngine:
         results_by_h = self.registry.evaluate_horizons(self.buffer, current_time, horizons=[5, 15, 30])
 
         # 2. Reliability Gate
-        gate_decision = self.gate.evaluate(self.buffer, current_time)
+        is_live_mode = (getattr(self, "mode", "synthetic") == "live")
+        gate_decision = self.gate.evaluate(self.buffer, current_time, is_live=is_live_mode)
         self.db.record_gate_decision(gate_decision, current_time, source=self.mode)
 
         # 3. Incident Grouping
-        incidents = self.grouper.group(results_by_h, gate_decision, current_time, interface_id=self.interface_id)
+        incidents = self.grouper.group(results_by_h, gate_decision, current_time, interface_id=self.interface_id, source=self.mode)
         for inc in incidents:
             if inc.id in getattr(self, "incident_states", {}):
                 inc.status = self.incident_states[inc.id]
@@ -551,7 +554,14 @@ class PrecursorEngine:
                 )
         resp_dict["claim_verifications"] = verified_results
 
+        if hasattr(self, "incident_db") and self.incident_db:
+            try:
+                self.incident_db.update_copilot_guidance(incident_id, copilot_resp)
+            except Exception:
+                pass
+
         # Record query and response to DB
+
         query_prompt = prompt or f"Explain incident {incident_id}: {inc_obj.title if inc_obj else ''}"
         self.db.record_copilot_query(
             prompt=query_prompt,

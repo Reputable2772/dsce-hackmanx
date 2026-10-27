@@ -22,15 +22,15 @@ class DetectorRegistry:
         self.detectors.append(FixedSLADetector(metric_id="packet_loss_pct", threshold=5.0, sustained_samples=2))
         self.detectors.append(FixedSLADetector(metric_id="jitter_ms", threshold=10.0, sustained_samples=2))
         self.detectors.append(FixedSLADetector(metric_id="drops_in", threshold=20.0, sustained_samples=2))
-        self.detectors.append(FixedSLADetector(metric_id="icmp_inbound_rate", threshold=50.0, sustained_samples=2))
-        self.detectors.append(FixedSLADetector(metric_id="packets_in_sec", threshold=50000.0, sustained_samples=2))
-        self.detectors.append(FixedSLADetector(metric_id="packets_out_sec", threshold=50000.0, sustained_samples=2))
+        self.detectors.append(FixedSLADetector(metric_id="icmp_inbound_rate", threshold=0.8, sustained_samples=2))
+        self.detectors.append(FixedSLADetector(metric_id="packets_in_sec", threshold=15000.0, sustained_samples=2))
+        self.detectors.append(FixedSLADetector(metric_id="packets_out_sec", threshold=15000.0, sustained_samples=2))
 
         # 2. EWMA Detectors with adaptive dynamic bands
         self.detectors.append(EWMADetector(metric_id="latency_ms", alpha=0.2, k_sigma=3.0))
         self.detectors.append(EWMADetector(metric_id="packet_loss_pct", alpha=0.2, k_sigma=3.0))
         self.detectors.append(EWMADetector(metric_id="jitter_ms", alpha=0.2, k_sigma=3.0))
-        self.detectors.append(EWMADetector(metric_id="icmp_inbound_rate", alpha=0.3, k_sigma=3.0))
+        self.detectors.append(EWMADetector(metric_id="icmp_inbound_rate", alpha=0.3, k_sigma=2.5))
         self.detectors.append(EWMADetector(metric_id="packets_in_sec", alpha=0.3, k_sigma=3.0))
         self.detectors.append(EWMADetector(metric_id="drops_in", alpha=0.3, k_sigma=3.0))
 
@@ -41,7 +41,7 @@ class DetectorRegistry:
         # 4. Immediate Rule Detectors (zero-latency alerts for hard failures)
         self.detectors.append(ImmediateFaultDetector(metric_id="link_state", down_value=0.0))
         self.detectors.append(ImmediateFaultDetector(metric_id="packet_loss_pct", down_value=100.0))
-        self.detectors.append(ImmediateFaultDetector(metric_id="icmp_inbound_rate", down_value=500.0, comparison="gte"))
+        self.detectors.append(ImmediateFaultDetector(metric_id="icmp_inbound_rate", down_value=25.0, comparison="gte"))
 
     def add_detector(self, detector: BaseDetector):
         self.detectors.append(detector)

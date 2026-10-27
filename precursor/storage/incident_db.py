@@ -406,9 +406,15 @@ class IncidentDB:
                     "telemetry_snapshot": json.loads(r["telemetry_snapshot"]),
                     "packet_samples_count": len(json.loads(r["packet_samples"])),
                     "copilot_summary": r["copilot_summary"],
-                    "hypotheses_count": len(json.loads(r["copilot_hypotheses"])),
-                    "assumptions_count": len(json.loads(r["copilot_assumptions"])),
-                    "claims_count": len(json.loads(r["copilot_claims"])),
+                    "copilot_hypotheses": json.loads(r["copilot_hypotheses"]) if r["copilot_hypotheses"] else [],
+                    "copilot_assumptions": json.loads(r["copilot_assumptions"]) if r["copilot_assumptions"] else [],
+                    "copilot_claims": json.loads(r["copilot_claims"]) if r["copilot_claims"] else [],
+                    "diagnostic_commands": json.loads(r["diagnostic_commands"]) if r["diagnostic_commands"] else [],
+                    "verification_steps": json.loads(r["verification_steps"]) if r["verification_steps"] else [],
+                    "risks_and_rollback": json.loads(r["risks_and_rollback"]) if r["risks_and_rollback"] else [],
+                    "hypotheses_count": len(json.loads(r["copilot_hypotheses"])) if r["copilot_hypotheses"] else 0,
+                    "assumptions_count": len(json.loads(r["copilot_assumptions"])) if r["copilot_assumptions"] else 0,
+                    "claims_count": len(json.loads(r["copilot_claims"])) if r["copilot_claims"] else 0,
                 })
 
             return {

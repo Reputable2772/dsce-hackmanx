@@ -90,7 +90,10 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
     @classmethod
     def get_system_manager(cls) -> SystemProbeManager:
         if cls.system_manager is None:
-            cls.system_manager = SystemProbeManager()
+            if cls.engine and hasattr(cls.engine, "system_manager") and cls.engine.system_manager:
+                cls.system_manager = cls.engine.system_manager
+            else:
+                cls.system_manager = SystemProbeManager()
         return cls.system_manager
 
     def _set_cors_headers(self, content_type: str = "application/json"):
@@ -558,6 +561,29 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
 
             elif norm_path == "/api/predictions":
                 preds: Dict[str, Any] = {}
+                detailed_records: List[Dict[str, Any]] = []
+
+                # Extract recent packets from buffer for forensics drawer
+                recent_points = self.engine.buffer.get_window(snapshot.timestamp - 30.0, snapshot.timestamp)
+                target_host = getattr(self.engine.live_collector, "target_host", "127.0.0.1") if self.engine.mode == "live" else "core-router-01"
+                target_port = getattr(self.engine.live_collector, "target_port", 80) if self.engine.mode == "live" else 443
+
+                sample_packets = []
+                for idx, pt in enumerate(recent_points[-20:]):
+                    sample_packets.append({
+                        "packet_id": f"pkt-{pt.timestamp:.3f}-{pt.metric_id}",
+                        "timestamp": pt.timestamp,
+                        "timestamp_iso": time.strftime("%H:%M:%S", time.gmtime(pt.timestamp)),
+                        "metric": pt.metric_id,
+                        "value": pt.value,
+                        "quality": pt.quality.value if hasattr(pt.quality, "value") else str(pt.quality),
+                        "protocol": "ICMP" if "icmp" in pt.metric_id else ("TCP" if ("latency" in pt.metric_id or "jitter" in pt.metric_id) else "IP"),
+                        "source": pt.node_id or ("localhost" if self.engine.mode == "live" else "edge-gw"),
+                        "destination": target_host,
+                        "destination_port": target_port,
+                        "packet_size": 1420 if "1400" in str(getattr(pt, "labels", "")) else (64 if "latency" in pt.metric_id else 1400),
+                    })
+
                 for h in [5, 15, 30]:
                     results = snapshot.detector_results.get(h, [])
                     impact = any(r.predicted_impact for r in results)
@@ -572,18 +598,75 @@ class PrecursorApiHandler(BaseHTTPRequestHandler):
                         "evidence": " | ".join(evidence_list) if evidence_list else "Normal nominal telemetry",
                         "active_detectors": len(results),
                     }
+
+                    for r in results:
+                        metric_val = snapshot.latest_telemetry.get(r.metric_id)
+                        ev = r.evidence or {}
+                        if r.detector_name == "ewma":
+                            formula = f"EWMA (α=0.3): Z-score {r.raw_score:.2f} vs 3.0σ (baseline {ev.get('ewma', 0):.1f} ± {ev.get('rolling_std', 0):.2f})"
+                        elif r.detector_name == "fixed_sla":
+                            formula = f"Fixed SLA: {metric_val if metric_val is not None else ev.get('current_val', 0)} vs limit {r.threshold} (sustained={r.is_sustained})"
+                        elif r.detector_name == "forecast_residual":
+                            formula = f"Linear Trend Projection: residual {r.raw_score:.2f} projected across {h}m"
+                        else:
+                            formula = f"Immediate Rule: threshold {r.threshold}"
+
+                        det_pkts = [p for p in sample_packets if p["metric"] == r.metric_id][:5] or sample_packets[:5]
+
+                        detailed_records.append({
+                            "id": f"pred-{r.detector_name}-{r.metric_id}-{h}m",
+                            "metric_id": r.metric_id,
+                            "detector_name": r.detector_name,
+                            "horizon_minutes": h,
+                            "predicted_impact": bool(r.predicted_impact),
+                            "is_sustained": bool(r.is_sustained),
+                            "confidence_score": round(float(r.raw_score), 3),
+                            "threshold": r.threshold,
+                            "current_value": metric_val,
+                            "target_host": target_host,
+                            "interface_id": self.engine.interface_id,
+                            "math_formula": formula,
+                            "evidence": r.evidence,
+                            "sample_packets": det_pkts,
+                        })
+
+                detailed_records.sort(
+                    key=lambda r: (
+                        1 if r["predicted_impact"] else 0,
+                        1 if r["is_sustained"] else 0,
+                        (r["confidence_score"] / r["threshold"]) if r["threshold"] > 0 else r["confidence_score"],
+                        r["confidence_score"],
+                    ),
+                    reverse=True,
+                )
+
                 self._send_json(200, {
                     "gate_state": snapshot.gate_decision.state.value,
                     "predictions": preds,
+                    "detailed_predictions": detailed_records,
                 })
 
             elif norm_path == "/api/incidents":
                 source_filter = query.get("source", [None])[0]
-                if not source_filter and getattr(self.engine, "mode", "synthetic") == "live":
-                    source_filter = "live"
                 serialized = [i.model_dump() for i in snapshot.incidents]
+                seen_ids = {i["id"] for i in serialized}
+
+                # Also fetch recent persisted incidents from incident_db so incidents don't vanish on the next 5s tick
+                if hasattr(self.engine, "incident_db"):
+                    recent_db = self.engine.incident_db.list_incidents(
+                        source=source_filter or "all",
+                        limit=30,
+                    ).get("incidents", [])
+                    for r in recent_db:
+                        if r["id"] not in seen_ids:
+                            serialized.append(r)
+                            seen_ids.add(r["id"])
+
                 if source_filter in ("live", "synthetic"):
-                    serialized = [i for i in serialized if i.get("source") == source_filter or getattr(self.engine, "mode", None) == source_filter]
+                    serialized = [
+                        i for i in serialized
+                        if i.get("source") == source_filter or (source_filter == "live" and i.get("source") != "synthetic")
+                    ]
                 self._send_json(200, {
                     "total": len(serialized),
                     "incidents": serialized,

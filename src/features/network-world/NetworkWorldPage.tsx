@@ -117,107 +117,51 @@ export const NetworkWorldPage: React.FC = () => {
     setInspectorOpen(true);
   };
 
-  // Derive active topology, isolating live probe targets and inbound peers when in Live Mode
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+
+  // Derive active topology for display, ensuring local host and configured targets exist
   const displayedTopology: NetworkTopologyData = useMemo(() => {
-    if (operatingMode === 'live') {
-      const liveNodes = topology.nodes.filter(
-        (n) => n.id === 'local-host' || 
-               n.id === 'inbound-peer' ||
-               n.id.includes('inbound') ||
-               n.id.includes('172-25-80-33') ||
-               n.metadata?.ipAddress === '172.25.80.33' ||
-               n.name.toLowerCase().includes('windows') ||
-               n.name.toLowerCase().includes('inbound') ||
-               n.name.toLowerCase().includes('probe') || 
-               n.name.toLowerCase().includes('target') || 
-               n.name.toLowerCase().includes('peer') ||
-               n.id.includes(targetHost) ||
-               n.metadata?.ipAddress === targetHost ||
-               n.type === 'endpoint'
-      );
-      if (liveNodes.length >= 2) {
-        const nodeIds = new Set(liveNodes.map((n) => n.id));
-        const liveLinks = topology.links.filter(
-          (l) => nodeIds.has(l.sourceId) && nodeIds.has(l.targetId)
-        );
-        return {
-          ...topology,
-          name: `Live Topology (${targetHost}:${targetPort})`,
-          description: `Active real-time probe topology monitoring physical link to target PC ${targetHost}:${targetPort} and inbound testing peer 172.25.80.33`,
-          isDemoFixture: false,
-          nodes: liveNodes,
-          links: liveLinks.length > 0 ? liveLinks : [
-            {
-              id: 'link-local-to-target',
-              sourceId: liveNodes[0].id,
-              targetId: liveNodes[1].id,
-              status: 'active' as const,
-              utilizationPct: 15.0,
-              latencyMs: latestStatus?.latest_metrics?.latency_ms ?? 1.2,
-              metadata: {
-                cableType: '1GbE Twisted Pair' as const,
-                bandwidthGbps: 1.0,
-                sourceInterface: interfaceId || 'eth0',
-                targetInterface: `port:${targetPort}`,
-              },
-            }
-          ],
-        };
+    if (operatingMode === 'live' || viewMode === 'systems') {
+      const nodes = [...(topology.nodes || [])];
+      let links = [...(topology.links || [])];
+
+      // 1. Ensure local monitoring host is present
+      if (!nodes.some((n) => n.id === 'local-host')) {
+        nodes.unshift({
+          id: 'local-host',
+          name: 'PRECURSOR Monitor Engine (Local Host)',
+          type: 'server',
+          position: [0, 0, 0],
+          status: 'healthy',
+          metrics: {
+            latencyMs: 0.1,
+            jitterMs: 0.05,
+            packetLossPct: 0.0,
+            throughputMbps: 1000.0,
+          },
+          metadata: {
+            role: 'Local Monitoring Host',
+            ipAddress: '127.0.0.1',
+            interfaceName: interfaceId || 'auto',
+            location: 'Local Workstation',
+            firmware: 'PRECURSOR Engine v1.0',
+          },
+        });
       }
-      // Guaranteed 3-node physical topology: Local host, Inbound testing workstation, and Outbound target
-      return {
-        id: 'live-target-network',
-        name: `Live Topology (${targetHost}:${targetPort})`,
-        description: `Active physical interface (${interfaceId}) link to target PC (${targetHost}:${targetPort}) and inbound testing peer (172.25.80.33)`,
-        isDemoFixture: false,
-        nodes: [
-          {
-            id: 'local-host',
-            name: 'PRECURSOR Monitor Engine (172.25.80.31)',
-            type: 'server' as const,
-            position: [0, 0, 0] as [number, number, number],
-            status: 'healthy' as const,
-            metrics: {
-              latencyMs: 0.1,
-              jitterMs: 0.05,
-              packetLossPct: 0.0,
-              throughputMbps: 1000.0,
-            },
-            metadata: {
-              role: 'Monitoring Host (Local NIC)',
-              ipAddress: '172.25.80.31',
-              interfaceName: interfaceId || 'enp0s31f6',
-              location: 'Local Host Station',
-              firmware: 'PRECURSOR Engine v1.0',
-            },
-          },
-          {
-            id: 'peer-inbound-172-25-80-33',
-            name: 'Windows Testing Workstation (172.25.80.33)',
-            type: 'endpoint' as const,
-            position: [-4.0, 1.5, 0] as [number, number, number],
-            status: 'healthy' as const,
-            metrics: {
-              latencyMs: 1.0,
-              jitterMs: 0.2,
-              packetLossPct: 0.0,
-              throughputMbps: null,
-            },
-            metadata: {
-              role: 'Inbound ICMP Echo Peer (Ping & Spam Source)',
-              ipAddress: '172.25.80.33',
-              macAddress: '48:9e:bd:74:93:e3',
-              interfaceName: 'enp0s31f6',
-              location: 'External Windows PC',
-              firmware: 'Active ICMP Echo Client',
-            },
-          },
-          {
-            id: `probe-target-${targetHost}`,
+
+      // 2. Ensure configured outbound target is present in live mode
+      if (operatingMode === 'live' && targetHost && targetHost !== '127.0.0.1' && targetHost !== 'localhost') {
+        const targetId = `peer-outbound-${targetHost.replace(/\./g, '-')}`;
+        const hasTarget = nodes.some(
+          (n) => n.id === targetId || n.id === `target-${targetHost}` || n.metadata?.ipAddress === targetHost
+        );
+        if (!hasTarget) {
+          nodes.push({
+            id: targetId,
             name: `Probe Target (${targetHost}:${targetPort})`,
-            type: 'endpoint' as const,
-            position: [4.0, 1.5, 0] as [number, number, number],
-            status: 'healthy' as const,
+            type: 'endpoint',
+            position: [6.5, 0, 0],
+            status: 'healthy',
             metrics: {
               latencyMs: latestStatus?.latest_metrics?.latency_ms ?? 1.2,
               jitterMs: latestStatus?.latest_metrics?.jitter_ms ?? 0.3,
@@ -225,48 +169,52 @@ export const NetworkWorldPage: React.FC = () => {
               throughputMbps: null,
             },
             metadata: {
-              role: 'Target Monitored PC',
+              role: 'Outbound Probe Target',
               ipAddress: targetHost,
               interfaceName: `port:${targetPort}`,
-              location: 'Secondary Testing Workstation',
-              firmware: 'Physical Network Target',
+              location: 'Monitored Target',
+              firmware: 'Live LAN Target',
             },
-          },
-        ],
-        links: [
-          {
-            id: 'link-inbound-to-local',
-            sourceId: 'peer-inbound-172-25-80-33',
-            targetId: 'local-host',
-            status: 'active' as const,
-            utilizationPct: 8.0,
-            latencyMs: 1.0,
-            metadata: {
-              cableType: '1GbE Twisted Pair' as const,
-              bandwidthGbps: 1.0,
-              sourceInterface: 'eth0',
-              targetInterface: interfaceId || 'enp0s31f6',
-            },
-          },
-          {
-            id: 'link-local-to-target',
+          });
+        }
+      }
+
+      // 3. Ensure every non-local peer has a live link to local-host
+      const existingLinkTargets = new Set(links.map((l) => l.targetId));
+      for (const node of nodes) {
+        if (node.id !== 'local-host' && !existingLinkTargets.has(node.id)) {
+          links.push({
+            id: `link-local-${node.id}`,
             sourceId: 'local-host',
-            targetId: `probe-target-${targetHost}`,
-            status: 'active' as const,
-            utilizationPct: 15.0,
-            latencyMs: latestStatus?.latest_metrics?.latency_ms ?? 1.2,
+            targetId: node.id,
+            status: node.status === 'healthy' ? 'active' : (node.status === 'degraded' ? 'degraded' : 'down'),
+            utilizationPct: node.status === 'healthy' ? 25.0 : 0.0,
+            latencyMs: node.metrics?.latencyMs ?? 1.2,
+            packetLossPct: node.metrics?.packetLossPct ?? 0.0,
             metadata: {
-              cableType: '1GbE Twisted Pair' as const,
+              cableType: '1GbE Twisted Pair',
               bandwidthGbps: 1.0,
-              sourceInterface: interfaceId || 'enp0s31f6',
-              targetInterface: `port:${targetPort}`,
+              sourceInterface: interfaceId || 'local-nic',
+              targetInterface: node.metadata?.interfaceName || 'nic',
             },
-          },
-        ],
+          });
+        }
+      }
+
+      return {
+        ...topology,
+        id: topology.id || 'precursor-systems-01',
+        name: operatingMode === 'live' ? `Live Target Topology • ${targetHost}:${targetPort}` : 'Peer Systems Network Topology',
+        description: operatingMode === 'live'
+          ? `Real-time physical link observation from local NIC ${interfaceId || 'auto'} to target ${targetHost}:${targetPort}`
+          : 'Dynamic multi-system topology driven by live ICMP ping & TCP network probes.',
+        isDemoFixture: false,
+        nodes,
+        links,
       };
     }
     return topology;
-  }, [topology, operatingMode, targetHost, targetPort, interfaceId, latestStatus]);
+  }, [topology, operatingMode, viewMode, targetHost, targetPort, interfaceId, latestStatus]);
 
   // Summary metrics calculated from live active topology
   const totalNodes = displayedTopology.nodes.length;
@@ -472,6 +420,8 @@ export const NetworkWorldPage: React.FC = () => {
               topology={displayedTopology}
               selectedNodeId={selectedNode?.id ?? null}
               selectedLinkId={selectedLink?.id ?? null}
+              hoveredNodeId={hoveredNodeId}
+              onHoverNodeId={setHoveredNodeId}
               onSelectNode={handleSelectNode}
               onSelectLink={handleSelectLink}
               inspectorOpen={inspectorOpen}
@@ -518,6 +468,8 @@ export const NetworkWorldPage: React.FC = () => {
             <NetworkNodeList
               nodes={displayedTopology.nodes}
               selectedNodeId={selectedNode?.id ?? null}
+              hoveredNodeId={hoveredNodeId}
+              onHoverNodeId={setHoveredNodeId}
               onSelectNode={handleSelectNode}
               onRefresh={loadTopology}
               isLiveMode={operatingMode === 'live'}
