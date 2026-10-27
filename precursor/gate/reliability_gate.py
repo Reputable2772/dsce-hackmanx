@@ -30,6 +30,7 @@ class ReliabilityGate:
         self.residual_expansion_threshold = residual_expansion_threshold
         self.lookback_seconds = lookback_seconds
         self.baseline_duration_seconds = baseline_duration_seconds
+        self._nominal_start_time: Optional[float] = None
 
     def evaluate(
         self,
@@ -132,14 +133,67 @@ class ReliabilityGate:
                 node_operational = True
                 break
 
+        # Check if physical link carrier is down (carrier = 0)
+        _, link_vals, _ = buffer.get_series("link_state", current_time - 15.0, current_time)
+        clean_link = link_vals[~np.isnan(link_vals)]
+        link_hard_down = len(clean_link) > 0 and clean_link[-1] == 0.0
+
+        # Check recent 10-second window for sustained normality
+        t_recent_10 = current_time - 10.0
+        recent_points = buffer.get_window(t_recent_10, current_time)
+        is_recent_normal = True
+        if not recent_points or link_hard_down or hard_sensor_failure:
+            is_recent_normal = False
+        else:
+            for pt in recent_points:
+                if pt.metric_id == "packet_loss_pct" and (pt.value is None or pt.value > 5.0):
+                    is_recent_normal = False
+                    break
+                elif pt.metric_id == "latency_ms" and (pt.value is None or pt.value > 50.0):
+                    is_recent_normal = False
+                    break
+                elif pt.metric_id == "jitter_ms" and (pt.value is not None and pt.value > 10.0):
+                    is_recent_normal = False
+                    break
+                elif pt.metric_id == "icmp_inbound_rate" and (pt.value is not None and pt.value > 2.0):
+                    is_recent_normal = False
+                    break
+                elif pt.metric_id == "link_state" and (pt.value is not None and pt.value < 1.0):
+                    is_recent_normal = False
+                    break
+
+        if is_recent_normal:
+            min_ts = min((pt.timestamp for pt in recent_points), default=current_time)
+            has_10s_span = (current_time - min_ts) >= 9.5 and len(recent_points) >= 5
+            if self._nominal_start_time is None or current_time < self._nominal_start_time:
+                self._nominal_start_time = current_time
+        else:
+            self._nominal_start_time = None
+            has_10s_span = False
+
+        sustained_normality = (
+            is_recent_normal and (
+                has_10s_span
+                or (self._nominal_start_time is not None and (current_time - self._nominal_start_time) >= 10.0)
+            )
+        )
+
         # 4. Synthesize Gate State
-        if hard_sensor_failure:
+        if link_hard_down:
+            state = GateState.ABSTAIN
+            reasons.append("Physical link state hard down (carrier=0): hardware link failure invalidates sensor telemetry.")
+            suppressed_metrics.extend(target_metrics)
+        elif hard_sensor_failure:
             if is_live and node_operational and unhealthy_ratio < 0.85:
                 # Other networks/interfaces are operational on the node: degrade rather than completely abstaining
                 state = GateState.DEGRADED
                 reasons.append("Peer probe sensor degraded, but node interfaces remain operational: preserving predictions in DEGRADED mode.")
             else:
                 state = GateState.ABSTAIN
+        elif sustained_normality:
+            # Feature: After 10 seconds of normality, return from DEGRADED back to PREDICT
+            state = GateState.PREDICT
+            reasons = ["Normality sustained for >10s: model predictions restored to PREDICT."]
         elif mild_sensor_degraded or drift_detected or residual_score > self.residual_expansion_threshold:
             state = GateState.DEGRADED
         else:

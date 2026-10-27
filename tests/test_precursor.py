@@ -112,6 +112,23 @@ def test_reliability_gate_three_states():
     # 3. Invariant: Immediate alerts remain active in all states
     assert dec_sensor.immediate_alerts_active is True
 
+    # 4. Recovery: After 10 seconds of normality, gate recovers to PREDICT
+    buf_rec = TelemetryBuffer()
+    t_start = 2000.0
+    for s in range(15):
+        t_curr = t_start + s
+        buf_rec.add_batch([
+            TelemetryPoint(timestamp=t_curr, metric_id="latency_ms", value=15.0, quality=MetricQuality.GOOD),
+            TelemetryPoint(timestamp=t_curr, metric_id="packet_loss_pct", value=0.0, quality=MetricQuality.GOOD),
+            TelemetryPoint(timestamp=t_curr, metric_id="jitter_ms", value=1.0, quality=MetricQuality.GOOD),
+            TelemetryPoint(timestamp=t_curr, metric_id="link_state", value=1.0, quality=MetricQuality.GOOD),
+        ])
+        gate.evaluate(buf_rec, t_curr)
+
+    dec_recovered = gate.evaluate(buf_rec, t_start + 14.0)
+    assert dec_recovered.state == GateState.PREDICT
+    assert "Normality sustained for >10s" in dec_recovered.reasons[0]
+
 
 # -------------------------------------------------------------
 # 4. Incident Grouping Tests
